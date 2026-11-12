@@ -23,6 +23,10 @@ jarvis-pc skill runs it (`mode <id>`). The repo ships **no** modes: you build th
 3. **What should close?** Background apps that get in the way (Discord, Steam, launchers...). Use process
    names without `.exe` (check them with `Get-Process`). Never put the browser, the orb (`pythonw`), your own
    agent, antivirus or Windows processes here, and never close things the user didn't name.
+   If they already have other modes (gaming...), offer to also close what those modes open: the games
+   themselves (find the real process name, e.g. from the game's install folder or `Get-Process` while it
+   runs), controller tools (DS4Windows, BetterJoy...) and Game Bar (`GameBar`, `GameBarFTServer`,
+   `XboxGameBarWidgets`). Warn that a closed game loses unsaved progress.
 4. **Music?** A Spotify playlist: ask them to share its link ("Share → Copy link to playlist") and store it as
    `spotify:playlist:<id>`. Optional `playlist_name` (exact name) helps press its play button.
 5. **Should you, the agent, change how you work in this mode?** (e.g. "short technical answers, read my
