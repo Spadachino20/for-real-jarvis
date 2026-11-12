@@ -1,0 +1,11 @@
+# For Real J.A.R.V.I.S. - Python 3.10-3.12 on Windows 10/11
+RealtimeSTT==1.1.2        # ears: Silero VAD + faster-whisper (pulls torch, ~2 GB the first time)
+kokoro-onnx==0.6.1        # local voice
+onnxruntime==1.31.1
+sounddevice==0.5.6
+PyAudio==0.2.14
+numpy==2.5.4
+httpx==0.28.1             # talks to your agent
+websockets==16.0          # OpenClaw gateway (panel)
+psutil==7.2.2             # panel: CPU, RAM, disks
+pillow==13.0.0            # "look at my screen"

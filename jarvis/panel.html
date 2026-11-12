@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>For Real J.A.R.V.I.S.</title>
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="icon" href="/static/orb.ico" sizes="any">
+<link rel="icon" href="/static/orb-192.png" type="image/png">
+<meta name="theme-color" content="#05090f">
+<style>
+  :root {
+    --bg: #05090f; --surface: #0a111c; --surface2: #0e1726; --line: #15233a; --line2: #1f3350;
+    --text: #e6f1ff; --soft: #8ea3bd; --dim: #4d6079;
+    --cyan: #38e1ff; --blue: #4f9dff; --orange: #ffb347; --green: #3ddc97; --red: #ff5d6c; --idle: #2b6f8a;
+    --orb: var(--idle);
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: var(--cyan); }
+  .app { display: grid; grid-template-columns: 216px 1fr 288px; height: 100vh; }
+
+  nav { border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; gap: 2px;
+        background: linear-gradient(180deg, #08101b, var(--bg)); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+  .brand b { font: 600 15px "Segoe UI Semibold", sans-serif; letter-spacing: .18em; }
+  .brand i { width: 10px; height: 10px; border-radius: 50%; background: var(--orb); box-shadow: 0 0 12px var(--orb); transition: .4s; }
+  nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px;
+               background: none; color: var(--soft); text-align: left; position: relative; }
+  nav button svg { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  nav button:hover { background: var(--surface); color: var(--text); }
+  nav button[aria-current="page"] { background: var(--surface2); color: var(--text); }
+  nav button[aria-current="page"]::before { content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 2px;
+                                            background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  nav .foot { margin-top: auto; padding: 10px; font-size: 12px; color: var(--dim); }
+
+  main { overflow-y: auto; padding: 26px 30px 40px; }
+  .section { display: none; max-width: 1060px; margin: 0 auto; }
+  .section.on { display: block; }
+  h1 { font: 600 20px "Segoe UI Semibold", sans-serif; margin-bottom: 4px; }
+  .lead { color: var(--soft); margin-bottom: 20px; }
+
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+  .card { background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent), var(--surface));
+          border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; min-width: 0; transition: border-color .2s; }
+  .card:hover { border-color: var(--line2); }
+  .label { font: 600 11px "Segoe UI Semibold", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--soft);
+           padding-bottom: 8px; margin-bottom: 12px; position: relative; display: flex; justify-content: space-between; gap: 8px; }
+  .label::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+                  background: linear-gradient(90deg, var(--cyan), transparent); opacity: .3; }
+  .label small { font: 400 12px "Segoe UI"; letter-spacing: 0; text-transform: none; color: var(--dim); }
+  .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; } .s6 { grid-column: span 6; }
+  .s7 { grid-column: span 7; } .s8 { grid-column: span 8; } .s12 { grid-column: span 12; }
+  .num { font: 300 30px var(--mono); line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .num small { font: 13px "Segoe UI"; color: var(--soft); margin-left: 3px; }
+  .glow { text-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 45%, transparent); }
+  .sub { color: var(--soft); font-size: 12.5px; }
+  .dim { color: var(--dim); }
+  .empty { color: var(--dim); padding: 6px 0; }
+  .error { color: var(--red); font-size: 13px; }
+
+  .hero { display: flex; align-items: center; gap: 30px; padding: 26px 28px; margin-bottom: 14px;
+          background: radial-gradient(500px 220px at 12% 50%, color-mix(in srgb, var(--orb) 16%, transparent), transparent 70%), var(--surface); }
+  .orb { position: relative; width: 132px; height: 132px; flex: none; }
+  .orb .ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--orb); transition: border-color .4s; }
+  .orb .ring:nth-child(2) { inset: -12px; border-width: 1px; opacity: .5; }
+  .orb .ring:nth-child(3) { inset: -24px; border-width: 1px; opacity: .25; }
+  .orb .arc { position: absolute; inset: -12px; border-radius: 50%; border: 3px solid transparent; border-top-color: var(--orange); opacity: 0; transition: opacity .3s; }
+  .orb .core { position: absolute; inset: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--bg);
+               border: 2px solid var(--orb); color: var(--orb); font: 600 30px "Segoe UI Semibold"; transition: .4s;
+               box-shadow: 0 0 34px color-mix(in srgb, var(--orb) 35%, transparent), inset 0 0 22px color-mix(in srgb, var(--orb) 25%, transparent); }
+  .alive .ring { animation: beat 1.6s ease-in-out infinite; }
+  .alive .ring:nth-child(2) { animation-delay: .2s; } .alive .ring:nth-child(3) { animation-delay: .4s; }
+  .thinking .arc { opacity: 1; animation: spin 1.2s linear infinite; }
+  @keyframes beat { 50% { transform: scale(1.06); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .alive .ring, .thinking .arc { animation: none; } }
+  .hello { font: 300 26px "Segoe UI Light", sans-serif; }
+  .orbstate { font: 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--orb); margin-top: 6px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+  .btn { border: 1px solid var(--line2); background: var(--surface2); padding: 8px 14px; border-radius: 9px; font-size: 13px; }
+  .btn:hover:not(:disabled) { border-color: var(--cyan); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 12%, transparent); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.main { background: color-mix(in srgb, var(--cyan) 16%, var(--surface2)); border-color: color-mix(in srgb, var(--cyan) 55%, transparent); }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .mode { text-align: left; border: 1px solid var(--line2); background: var(--surface2); border-radius: 11px; padding: 14px; }
+  .mode:hover:not(:disabled) { border-color: var(--cyan); }
+  .mode:disabled { opacity: .5; cursor: default; }
+  .mode b { display: block; font: 600 15px "Segoe UI Semibold"; margin: 6px 0 2px; }
+  .mode span { color: var(--soft); font-size: 12px; }
+  .mode svg { width: 20px; height: 20px; stroke: var(--cyan); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .mode.active { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 14%, transparent); }
+  .mode.new { border-style: dashed; }
+  .result { margin-top: 12px; padding: 10px 12px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line);
+            font: 12.5px var(--mono); white-space: pre-wrap; color: var(--soft); }
+
+  .meter { margin-bottom: 12px; }
+  .meter .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+  .track { height: 6px; border-radius: 9px; background: #13233a; overflow: hidden; }
+  .track i { display: block; height: 100%; border-radius: 9px; background: var(--cyan); transition: width .6s; }
+  .track i.high { background: var(--orange); } .track i.crit { background: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font: 600 11px "Segoe UI Semibold"; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 0 8px 8px 0; }
+  td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+  td.n, th.n { white-space: nowrap; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11.5px; background: #13233a; color: var(--soft); white-space: nowrap; }
+  .tag.green { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+  .tag.orange { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
+  .tag.red { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+  .warn { margin-top: 12px; padding: 10px 12px; border-radius: 9px; font-size: 13px;
+          background: color-mix(in srgb, var(--red) 11%, transparent); border: 1px solid color-mix(in srgb, var(--red) 35%, transparent); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dim); margin-right: 6px; }
+  .dot.ok { background: var(--green); box-shadow: 0 0 9px var(--green); } .dot.bad { background: var(--red); box-shadow: 0 0 9px var(--red); }
+
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; padding-bottom: 18px; position: relative; }
+  .bar { flex: 1; min-width: 0; display: flex; flex-direction: column-reverse; height: 100%; position: relative; }
+  .bar i { display: block; border-radius: 2px 2px 0 0; margin-top: 1px; min-height: 1px; }
+  .bar em { position: absolute; bottom: -18px; left: -6px; right: -6px; text-align: center; font: normal 10px var(--mono); color: var(--dim); }
+
+  .chat { display: flex; flex-direction: column; height: calc(100vh - 150px); }
+  .msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 4px 16px; }
+  .msg { max-width: 76%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, var(--cyan) 14%, var(--surface2)); border: 1px solid color-mix(in srgb, var(--cyan) 30%, transparent); }
+  .msg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); }
+  .msg .meta { font-size: 11px; color: var(--dim); margin-top: 4px; }
+  .tool { display: inline-block; font: 11px var(--mono); color: var(--soft); background: var(--bg); border: 1px solid var(--line);
+          border-radius: 6px; padding: 1px 6px; margin: 4px 4px 0 0; }
+  .compose { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .compose textarea { flex: 1; resize: none; height: 46px; background: var(--surface); border: 1px solid var(--line2); border-radius: 10px;
+                      color: var(--text); font: inherit; padding: 11px 14px; }
+  .compose textarea:focus { outline: none; border-color: var(--cyan); }
+
+  .log { font: 12px/1.55 var(--mono); max-height: 62vh; overflow: auto; }
+  .log div { padding: 3px 0; border-top: 1px solid #0f1a2b; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .log .WARN { color: var(--orange); } .log .ERROR, .log .FATAL { color: var(--red); }
+
+  aside { border-left: 1px solid var(--line); padding: 22px 18px; overflow-y: auto; background: linear-gradient(180deg, #08101b, var(--bg)); }
+  aside h2 { font: 600 11px "Segoe UI Semibold"; letter-spacing: .16em; text-transform: uppercase; color: var(--soft); margin: 18px 0 10px; }
+  aside h2:first-child { margin-top: 0; }
+  .fact { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13px; border-top: 1px solid var(--line); }
+  .fact span:last-child { color: var(--soft); text-align: right; font-variant-numeric: tabular-nums; }
+  .mini b { display: block; font: 600 14px "Segoe UI Semibold"; overflow-wrap: anywhere; }
+  .clock { font: 300 26px var(--mono); font-variant-numeric: tabular-nums; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--line2);
+           padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 1180px) { .app { grid-template-columns: 200px 1fr; } aside { display: none; } }
+  @media (max-width: 820px) {
+    body { overflow: auto; } .app { display: block; height: auto; }
+    nav { flex-direction: row; overflow-x: auto; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; position: sticky; top: 0; z-index: 5; background: var(--bg); }
+    nav button { width: auto; white-space: nowrap; } nav .brand, nav .foot { display: none; }
+    nav button[aria-current="page"]::before { display: none; }
+    main { padding: 18px 16px 40px; overflow: visible; }
+    .s3, .s4, .s5, .s6, .s7, .s8 { grid-column: span 12; }
+    .hero { flex-direction: column; text-align: center; } .actions { justify-content: center; }
+    .chat { height: 70vh; } .msg { max-width: 92%; }
+    .bar:not(:nth-child(5n+1)) em { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav aria-label="Sections">
+    <div class="brand"><i></i><b>J.A.R.V.I.S.</b></div>
+    <button data-go="home"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span data-t="home">Home</span></button>
+    <button data-go="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span data-t="chat">Chat</span></button>
+    <button data-go="modes"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg><span data-t="modes">Modes</span></button>
+    <button data-go="tokens"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span data-t="tokens">Tokens</span></button>
+    <button data-go="automations"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span data-t="automations">Automations</span></button>
+    <button data-go="sessions"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-t="sessions">Sessions</span></button>
+    <button data-go="pc"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span>PC</span></button>
+    <button data-go="logs"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg><span data-t="logs">Logs</span></button>
+    <div class="foot"><span data-t="onlyhere">Only from this PC</span><br><a id="agentLink" href="#" target="_blank" rel="noopener"></a></div>
+  </nav>
+
+  <main>
+    <section class="section" id="home">
+      <div class="card hero">
+        <div class="orb" id="bigOrb"><span class="ring"></span><span class="ring"></span><span class="ring"></span><span class="arc"></span><span class="core">J</span></div>
+        <div>
+          <div class="hello" id="hello"></div>
+          <div class="orbstate" id="orbState">…</div>
+          <div class="sub" id="modeLine" style="margin-top:10px"></div>
+          <div class="actions">
+            <button class="btn main" data-task="personalize" data-t="personalize">Personalize JARVIS</button>
+            <button class="btn" data-task="create-mode" data-t="newmode">Create a mode</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card s3"><div class="label" data-t="agent">Agent</div><div class="num" id="hAgent">—</div><div class="sub" id="hModel"></div></div>
+        <div class="card s3"><div class="label" data-t="reply">Reply time</div><div class="num glow" id="hReply">—</div><div class="sub" data-t="usual">usual, last 14</div></div>
+        <div class="card s3"><div class="label" data-t="tokenstoday">Tokens today</div><div class="num glow" id="hTokens">—</div><div class="sub" id="hTokens30"></div></div>
+        <div class="card s3"><div class="label">PC</div><div class="num" id="hPC">—</div><div class="sub" id="hPCsub"></div></div>
+        <div class="card s8"><div class="label"><span data-t="modes">Modes</span><small data-t="oneclick">one click</small></div><div class="modes" id="homeModes"></div>
+          <div class="result" id="homeResult" hidden></div></div>
+        <div class="card s4"><div class="label" data-t="music">Music</div><div id="hMusic" class="empty">—</div></div>
+        <div class="card s6"><div class="label" data-t="nextrem">Next reminders</div><div id="hReminders" class="empty">—</div></div>
+        <div class="card s6"><div class="label"><span data-t="stability">Stability</span><small data-t="30d">30 days</small></div><div id="hCrashes" class="empty">—</div></div>
+      </div>
+    </section>
+
+    <section class="section" id="chat">
+      <h1 data-t="chat">Chat</h1>
+      <p class="lead" data-t="chatlead">The same conversation as the orb.</p>
+      <div class="chat">
+        <div class="msgs" id="msgs" aria-live="polite"></div>
+        <form class="compose" id="chatForm">
+          <textarea id="chatText" aria-label="Message"></textarea>
+          <button class="btn main" id="sendBtn" data-t="send">Send</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section" id="modes">
+      <h1 data-t="modes">Modes</h1>
+      <p class="lead" data-t="modeslead">Set up your PC in one click. Same as asking by voice.</p>
+      <div class="grid">
+        <div class="card s12"><div class="label" data-t="pick">Pick a mode</div><div class="modes" id="bigModes"></div></div>
+        <div class="card s12"><div class="label"><span data-t="lastresult">Last result</span><small id="modeTime"></small></div><div class="result" id="modeResult"></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="tokens">
+      <h1 data-t="tokens">Tokens</h1>
+      <p class="lead" data-t="tokenslead">What your agent used in the last 30 days.</p>
+      <div class="grid" id="tokensBody"><div class="card s12 empty">…</div></div>
+    </section>
+
+    <section class="section" id="automations">
+      <h1 data-t="automations">Automations</h1>
+      <p class="lead" data-t="autolead">Your reminders and your agent's scheduled tasks. To create one, just ask JARVIS ("remind me…").</p>
+      <div class="card" id="autoBody"><div class="empty">…</div></div>
+    </section>
+
+    <section class="section" id="sessions">
+      <h1 data-t="sessions">Sessions</h1>
+      <p class="lead" data-t="seslead">Every conversation of your agent.</p>
+      <div class="card" id="sesBody"><div class="empty">…</div></div>
+    </section>
+
+    <section class="section" id="pc">
+      <h1>PC</h1>
+      <p class="lead" id="pcLead"></p>
+      <div class="grid">
+        <div class="card s6"><div class="label" data-t="usage">Usage</div><div id="pcUse" class="empty">—</div></div>
+        <div class="card s6"><div class="label" data-t="mostmem">Most memory</div><div id="pcProcs" class="empty">—</div></div>
+        <div class="card s12"><div class="label"><span data-t="stability">Stability</span><small data-t="30d">30 days</small></div><div id="pcCrashes" class="empty">—</div></div>
+      </div>
+    </section>
+
+    <section class="section" id="logs">
+      <h1 data-t="logs">Logs</h1>
+      <p class="lead" data-t="logslead">What happened last, newest first.</p>
+      <div class="grid">
+        <div class="card s7"><div class="label" data-t="gatewaylog">OpenClaw gateway</div><div class="log" id="logGateway"></div></div>
+        <div class="card s5"><div class="label" data-t="orblog">Orb</div><div class="log" id="logOrb"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <aside aria-label="System">
+    <h2 data-t="system">System</h2>
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="fact"><span><i class="dot" id="aDot"></i><span data-t="agent">Agent</span></span><span id="aAgent">—</span></div>
+    <div class="fact"><span data-t="model">Model</span><span id="aModel">—</span></div>
+    <div class="meter" style="margin-top:8px" id="aCtxBox" hidden><div class="row"><span data-t="context">Context</span><span class="sub" id="aCtx">—</span></div><div class="track"><i id="aCtxBar" style="width:0"></i></div></div>
+    <h2 data-t="orb">Orb</h2>
+    <div class="fact"><span data-t="state">State</span><span id="aState">—</span></div>
+    <div class="fact"><span data-t="mic">Microphone</span><span id="aMic">—</span></div>
+    <div class="fact"><span data-t="voice">Voice</span><span id="aVoice">—</span></div>
+    <div class="fact"><span data-t="hotkey">Hotkey</span><span id="aKey">—</span></div>
+    <div class="fact"><span data-t="mode">Mode</span><span id="aMode">—</span></div>
+    <h2 data-t="music">Music</h2>
+    <div class="mini" id="aMusic"><span class="dim">—</span></div>
+    <h2>PC</h2>
+    <div id="aPC"></div>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const KEY = "__KEY__";   // put here by the server: without it the buttons do nothing
+const LANG = "__LANG__";
+const T = {
+  en: {home: "Home", chat: "Chat", modes: "Modes", tokens: "Tokens", automations: "Automations", sessions: "Sessions", logs: "Logs",
+    onlyhere: "Only from this PC", personalize: "Personalize JARVIS", newmode: "Create a mode", agent: "Agent", reply: "Reply time",
+    usual: "usual, last 14", tokenstoday: "Tokens today", oneclick: "one click", music: "Music", nextrem: "Next reminders",
+    stability: "Stability", "30d": "30 days", chatlead: "The same conversation as the orb.", send: "Send",
+    modeslead: "Set up your PC in one click. Same as asking by voice.", pick: "Pick a mode", lastresult: "Last result",
+    tokenslead: "What your agent used in the last 30 days.", autolead: "Your reminders and your agent's scheduled tasks. To create one, just ask JARVIS (\"remind me…\").",
+    seslead: "Every conversation of your agent.", usage: "Usage", mostmem: "Most memory", logslead: "What happened last, newest first.",
+    gatewaylog: "OpenClaw gateway", orblog: "Orb", system: "System", model: "Model", context: "Context", orb: "Orb", state: "State",
+    mic: "Microphone", voice: "Voice", hotkey: "Hotkey", mode: "Mode",
+    morning: "Good morning, sir.", afternoon: "Good afternoon, sir.", evening: "Good evening, sir.",
+    online: "Online", down: "Down", working: "working", nomodes: "No modes yet. Create your first one with JARVIS: he asks you what to open, close and play.",
+    newmodehint: "JARVIS asks you a few questions", exit: "Exit", exithint: "JARVIS goes back to normal", running: "Running", done: "Done:", failed: "Error in",
+    norun: "No mode run yet.", starting: "starting…", placeholder: "Write to JARVIS…  (Enter sends, Shift+Enter new line)",
+    you: "You", byvoice: "You · by voice", thinkingdots: "JARVIS is thinking", openclawonly: "Available when your agent is OpenClaw.",
+    agentdown: "Your agent isn't answering.", total30: "in 30 days", tokens30: "30 days", total: "tokens in total", today: "Today",
+    cache: "Cache", cachesub: "reused (almost free)", cost: "Cost", costsub: "subscription models count as $0", perday: "Per day",
+    persession: "Per session", top10: "top 10", session: "Session", messages: "Messages", errors: "Errors", permodel: "Per model",
+    nomodel: "No per-model split.", name: "Name", when: "When", next: "Next", last: "Last", runnow: "Run now", pause: "Pause",
+    resume: "Resume", paused: "paused", noauto: "No automations.", queued: "Queued.", pausedok: "Paused.", resumed: "Resumed.",
+    runconfirm: "Run this automation now?", noreminders: "None pending. Say \"remind me…\".", lastact: "Last activity",
+    since: "How the machine is doing. On since", bluescreens: "blue screens", shutdowns: "hard shutdowns", hardware: "hardware errors",
+    ramhint: "These codes usually point to the RAM. Next step: run MemTest86.", nothing: "Nothing playing", on: "on", muted: "muted",
+    normal: "normal", empty: "Empty.", task: "Sent to JARVIS: answer him in the chat.", openagent: "Open your agent ↗",
+    idle: "idle", listening: "listening", thinking: "thinking", speaking: "speaking", loading: "loading", "mic off": "mic off", orboff: "orb off",
+    playing: "playing", paused: "paused", stopped: "stopped", free: "free"},
+  es: {home: "Inicio", chat: "Chat", modes: "Modos", tokens: "Tokens", automations: "Automatizaciones", sessions: "Sesiones", logs: "Registros",
+    onlyhere: "Solo desde esta PC", personalize: "Personalizar JARVIS", newmode: "Crear un modo", agent: "Agente", reply: "Respuesta",
+    usual: "lo normal, últimas 14", tokenstoday: "Tokens hoy", oneclick: "un clic", music: "Música", nextrem: "Próximos recordatorios",
+    stability: "Estabilidad", "30d": "30 días", chatlead: "La misma conversación que el orbe.", send: "Mandar",
+    modeslead: "Preparan la PC en un clic. Los mismos que le podés pedir por voz.", pick: "Elegí un modo", lastresult: "Último resultado",
+    tokenslead: "Lo que consumió tu agente en los últimos 30 días.", autolead: "Tus recordatorios y las tareas programadas de tu agente. Para crear una, pedíselo a JARVIS (\"recordame…\").",
+    seslead: "Cada conversación de tu agente.", usage: "Uso", mostmem: "Lo que más memoria usa", logslead: "Lo último que pasó, lo más nuevo arriba.",
+    gatewaylog: "Gateway de OpenClaw", orblog: "Orbe", system: "Sistema", model: "Modelo", context: "Contexto", orb: "Orbe", state: "Estado",
+    mic: "Micrófono", voice: "Voz", hotkey: "Atajo", mode: "Modo",
+    morning: "Buenos días, señor.", afternoon: "Buenas tardes, señor.", evening: "Buenas noches, señor.",
+    online: "En línea", down: "Caído", working: "trabajando", nomodes: "Todavía no tenés modos. Creá el primero con JARVIS: te pregunta qué abrir, cerrar y qué música poner.",
+    newmodehint: "JARVIS te hace unas preguntas", exit: "Salir de", exithint: "JARVIS vuelve a lo normal", running: "Corriendo", done: "Listo:", failed: "Error en",
+    norun: "Todavía no corriste ningún modo.", starting: "arrancando…", placeholder: "Escribile a JARVIS…  (Enter manda, Shift+Enter baja de línea)",
+    you: "Vos", byvoice: "Vos · por voz", thinkingdots: "JARVIS está pensando", openclawonly: "Disponible cuando tu agente es OpenClaw.",
+    agentdown: "Tu agente no responde.", total30: "en 30 días", tokens30: "30 días", total: "tokens en total", today: "Hoy",
+    cache: "Caché", cachesub: "reutilizados (casi gratis)", cost: "Costo", costsub: "los modelos por suscripción cuentan $0", perday: "Por día",
+    persession: "Por sesión", top10: "las 10 que más gastan", session: "Sesión", messages: "Mensajes", errors: "Errores", permodel: "Por modelo",
+    nomodel: "Sin separación por modelo.", name: "Nombre", when: "Cuándo", next: "Próxima", last: "Última", runnow: "Correr ahora", pause: "Pausar",
+    resume: "Activar", paused: "pausada", noauto: "No hay automatizaciones.", queued: "En cola.", pausedok: "Pausada.", resumed: "Activada.",
+    runconfirm: "¿Correr esta automatización ahora?", noreminders: "Ninguno pendiente. Decile \"recordame…\".", lastact: "Última actividad",
+    since: "Cómo está la máquina ahora. Prendida desde el", bluescreens: "pantallazos", shutdowns: "apagones bruscos", hardware: "errores de hardware",
+    ramhint: "Estos códigos suelen apuntar a la RAM. Próximo paso: pasar MemTest86.", nothing: "Nada sonando", on: "prendido", muted: "silenciado",
+    normal: "normal", empty: "Vacío.", task: "Se lo mandé a JARVIS: contestale en el chat.", openagent: "Abrir tu agente ↗",
+    idle: "en espera", listening: "escuchando", thinking: "pensando", speaking: "hablando", loading: "cargando", "mic off": "mic apagado", orboff: "orbe apagado",
+    playing: "sonando", paused: "en pausa", stopped: "detenida", free: "libres"},
+};
+const t = k => (T[LANG] || T.en)[k] ?? T.en[k] ?? k;
+document.documentElement.lang = LANG;
+document.querySelectorAll("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
+document.getElementById("chatText").placeholder = t("placeholder");
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const COLOR = {idle: "--idle", listening: "--cyan", thinking: "--orange", speaking: "--blue", loading: "--dim", "mic off": "--red"};
+const RAM = ["0x0000012b", "0x0000001a", "0x00000050", "0x000000ef"];  // blue screen codes that usually mean bad RAM
+const ICONS = {
+  briefcase: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M9 6V4h6v2"/>', code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13 6l-2 12"/>',
+  gamepad: '<rect x="3" y="8" width="18" height="9" rx="4"/><path d="M8 11v3M6.5 12.5h3M15 12h.01M17 13h.01"/>',
+  car: '<path d="M4 15h16l-2-5H8z"/><circle cx="8" cy="16" r="2"/><circle cx="17" cy="16" r="2"/>', shield: '<path d="M12 3 4 7v6c0 4 3.5 7 8 8 4.5-1 8-4 8-8V7z"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/>', moon: '<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/>',
+  music: '<path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>', bolt: '<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', exit: '<path d="M15 12H3M7 8l-4 4 4 4M13 5h6v14h-6"/>'};
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? Math.round(n / 1e3) + " k" : String(n ?? 0);
+let last = {};
+
+function toast(text) { const e = $("toast"); e.textContent = text; e.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove("show"), 3500); }
+async function get(path) { const r = await fetch(path, {cache: "no-store"}); return r.json(); }
+async function post(path, data) {
+  const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Jarvis-Key": KEY}, body: JSON.stringify(data)});
+  const j = await r.json().catch(() => ({ok: false, error: "bad answer"}));
+  if (!j.ok) toast(j.error || "Failed.");
+  return j;
+}
+function meter(name, pct, detail, neutral = false) {  // neutral: a proportion, not an alarm
+  const cls = neutral ? "" : pct >= 90 ? "crit" : pct >= 75 ? "high" : "";
+  return `<div class="meter"><div class="row"><span>${name}</span><span class="sub">${detail}</span></div><div class="track"><i class="${cls}" style="width:${Math.min(100, pct)}%"></i></div></div>`;
+}
+function median(xs) { const o = [...xs].sort((a, b) => a - b), m = o.length >> 1; return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2; }
+const unavailable = r => r?.error === "openclaw_only" ? `<div class="empty">${t("openclawonly")}</div>` : r?.error === "agent_down" ? `<div class="empty">${t("agentdown")}</div>` : r?.error ? `<div class="error">${esc(r.error)}</div>` : "";
+
+/* ---------- navigation ---------- */
+const LOAD = {chat: loadChat, tokens: loadTokens, automations: loadAuto, sessions: loadSessions, logs: loadLogs};
+function go(id) {
+  if (!$(id) || !$(id).classList.contains("section")) id = "home";
+  document.querySelectorAll(".section").forEach(s => s.classList.toggle("on", s.id === id));
+  document.querySelectorAll("nav [data-go]").forEach(b => b.dataset.go === id ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  LOAD[id]?.()?.catch?.(() => {});
+}
+document.querySelectorAll("nav [data-go]").forEach(b => b.addEventListener("click", () => go(b.dataset.go)));
+const current = () => document.querySelector(".section.on")?.id;
+addEventListener("hashchange", () => { if (location.hash.slice(1) !== current()) go(location.hash.slice(1)); });
+
+/* ---------- tasks for the agent (personalize, create a mode) ---------- */
+document.querySelectorAll("[data-task]").forEach(b => b.addEventListener("click", () => askAgent(b.dataset.task)));
+async function askAgent(task) {
+  if ((await post("/api/task", {task})).ok) { toast(t("task")); go("chat"); chatSig = ""; }
+}
+
+/* ---------- modes (from data/modes.json) ---------- */
+let modesSig = "";
+function drawModes(modes, state) {
+  const sig = JSON.stringify(modes) + state.active;
+  if (sig === modesSig) return;
+  modesSig = sig;
+  const html = modes.map(m => `<button class="mode ${state.active === m.id ? "active" : ""}" data-mode="${esc(m.id)}"><svg viewBox="0 0 24 24">${ICONS[m.icon] || ICONS.bolt}</svg><b>${esc(m.title)}</b><span>${esc(m.description)}</span></button>`).join("")
+    + modes.filter(m => state.active === m.id).map(m => `<button class="mode" data-leave="${esc(m.id)}"><svg viewBox="0 0 24 24">${ICONS.exit}</svg><b>${t("exit")} ${esc(m.title)}</b><span>${t("exithint")}</span></button>`).join("")
+    + `<button class="mode new" data-newmode><svg viewBox="0 0 24 24">${ICONS.plus}</svg><b>${t("newmode")}</b><span>${modes.length ? t("newmodehint") : t("nomodes")}</span></button>`;
+  for (const id of ["homeModes", "bigModes"]) {
+    $(id).innerHTML = html;
+    $(id).querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", async () => {
+      const m = modes.find(x => x.id === b.dataset.mode);
+      if (m.confirm && !confirm(m.confirm)) return;
+      if ((await post("/api/mode", {id: m.id})).ok) toast(`${m.title}: ${t("starting")}`);
+    }));
+    $(id).querySelectorAll("[data-leave]").forEach(b => b.addEventListener("click", () => post("/api/mode", {id: b.dataset.leave, leave: true})));
+    $(id).querySelector("[data-newmode]").addEventListener("click", () => askAgent("create-mode"));
+  }
+}
+function drawModeState(m, modes) {
+  const running = m.state === "running";
+  document.querySelectorAll(".mode").forEach(b => b.disabled = running);
+  const active = modes.find(x => x.id === m.active);
+  $("aMode").innerHTML = active ? `<span class="tag green">${esc(active.title)}</span>` : t("normal");
+  const text = running ? `${t("running")} ${m.name}…` : m.result ? `${m.state === "error" ? t("failed") : t("done")} ${m.name} (${m.time})\n${m.result.replaceAll(" | ", "\n")}` : "";
+  $("modeLine").innerHTML = active ? `<span class="tag green">${esc(active.title)}</span>` : running ? `<span class="tag orange">${t("running")} ${esc(m.name)}…</span>` : "";
+  $("homeResult").hidden = !text; $("homeResult").textContent = text;
+  $("modeResult").textContent = text || t("norun"); $("modeTime").textContent = m.time || "";
+}
+
+/* ---------- live status (every 2 s) ---------- */
+function drawStatus(d) {
+  last = d;
+  const o = d.orb || {}, p = d.pc || {}, mn = d.main || {}, mu = d.music || {};
+  $("clock").textContent = d.now;
+  const h = +d.now.slice(0, 2);
+  $("hello").textContent = t(h < 12 ? "morning" : h < 19 ? "afternoon" : "evening");
+  document.documentElement.style.setProperty("--orb", `var(${COLOR[o.state] || "--idle"})`);
+  $("bigOrb").classList.toggle("alive", ["listening", "speaking"].includes(o.state));
+  $("bigOrb").classList.toggle("thinking", o.state === "thinking" || !!mn.working);
+  $("orbState").textContent = mn.working && o.state !== "speaking" ? t("working") : t(o.state || "loading");
+
+  const kindName = d.kind === "openclaw" ? "OpenClaw" : d.kind === "hermes" ? "Hermes" : "Agent";
+  $("agentLink").textContent = t("openagent"); $("agentLink").href = d.kind === "openclaw" ? "http://127.0.0.1:18789/" : "#";
+  $("agentLink").hidden = d.kind !== "openclaw";
+  $("aDot").className = "dot " + (d.agent ? "ok" : "bad");
+  $("aAgent").textContent = `${kindName} · ${d.agent ? (mn.working ? t("working") : t("online")) : t("down")}`;
+  $("hAgent").innerHTML = d.agent ? `<span style="color:var(--green)">${t("online")}</span>` : `<span style="color:var(--red)">${t("down")}</span>`;
+  $("hModel").textContent = mn.model || kindName;
+  $("aModel").textContent = mn.model || "—";
+  $("aCtxBox").hidden = !mn.context_max;
+  if (mn.context_max) {
+    const pct = 100 * mn.context / mn.context_max;
+    $("aCtx").textContent = `${fmt(mn.context)} / ${fmt(mn.context_max)} (${Math.round(pct)} %)`;
+    $("aCtxBar").style.width = pct + "%"; $("aCtxBar").className = pct >= 85 ? "crit" : pct >= 65 ? "high" : "";
+  }
+  $("aState").textContent = t(o.state || "loading"); $("aMic").textContent = o.mic ? t("on") : t("muted");
+  $("aVoice").textContent = `${o.voice || "—"} · ${o.speaks || ""}`; $("aKey").textContent = o.hotkey || "—";
+
+  const tm = Array.isArray(d.timings) ? d.timings : [];
+  $("hReply").innerHTML = tm.length ? `${median(tm.map(x => x.agent)).toFixed(1)}<small>s</small>` : "—";
+
+  const music = mu.title ? `<span class="tag ${mu.state === "playing" ? "green" : ""}">${esc(mu.app)} · ${esc(t(mu.state))}</span><b style="margin-top:8px;font:600 16px 'Segoe UI Semibold';display:block">${esc(mu.title)}</b><span class="sub">${esc(mu.artist)}</span>`
+    : `<span class="dim">${esc(mu.text || mu.error || t("nothing"))}</span>`;
+  $("aMusic").innerHTML = music; $("hMusic").className = ""; $("hMusic").innerHTML = music;
+
+  if (p.cpu !== undefined) {
+    $("hPC").innerHTML = `${Math.round(p.ram_pct)}<small>% RAM</small>`; $("hPCsub").textContent = `CPU ${Math.round(p.cpu)} % · ${p.ram_used} / ${p.ram_total} GB`;
+    const use = meter("CPU", p.cpu, `${Math.round(p.cpu)} %`) + meter("RAM", p.ram_pct, `${p.ram_used} / ${p.ram_total} GB`)
+      + p.disks.map(x => meter(esc(x.letter), x.pct, `${x.free_gb} GB ${t("free")}`)).join("");
+    $("aPC").innerHTML = use; $("pcUse").className = ""; $("pcUse").innerHTML = use;
+    $("pcLead").textContent = `${t("since")} ${p.since}.`;
+    $("pcProcs").className = ""; $("pcProcs").innerHTML = `<table><tbody>${p.processes.map(x => `<tr><td>${esc(x.name)}</td><td class="n">${x.mb} MB</td></tr>`).join("")}</tbody></table>`;
+  }
+  const c = d.crashes || {};
+  if (c.bluescreens) {
+    const ram = c.bluescreens.some(x => RAM.includes((x.code || "").toLowerCase()));
+    const html = `<div style="display:flex;gap:28px;flex-wrap:wrap">
+        <div><div class="num">${c.bluescreens.length}</div><div class="sub">${t("bluescreens")}</div></div>
+        <div><div class="num">${c.shutdowns}</div><div class="sub">${t("shutdowns")}</div></div>
+        <div><div class="num">${c.hardware}</div><div class="sub">${t("hardware")}</div></div></div>
+      ${c.bluescreens.length ? `<table style="margin-top:10px"><tbody>${c.bluescreens.slice(0, 4).map(x => `<tr><td>${esc(x.when)}</td><td class="n">${esc(x.code)}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${ram ? `<div class="warn">${t("ramhint")}</div>` : ""}`;
+    $("hCrashes").className = ""; $("hCrashes").innerHTML = html; $("pcCrashes").className = ""; $("pcCrashes").innerHTML = html;
+  }
+  drawModes(d.modes || [], d.mode || {});
+  drawModeState(d.mode || {}, d.modes || []);
+  $("sendBtn").disabled = !!d.chat?.waiting;
+}
+async function refresh() {
+  try { drawStatus(await get("/api/status")); }
+  catch { $("orbState").textContent = t("orboff"); $("aDot").className = "dot bad"; }
+}
+
+/* ---------- tokens (OpenClaw) ---------- */
+async function loadTokens() {
+  const k = await get("/api/tokens");
+  if (k.error) { $("tokensBody").innerHTML = `<div class="card s12">${unavailable(k)}</div>`; $("hTokens").textContent = "—"; return; }
+  $("hTokens").textContent = fmt(k.today); $("hTokens30").textContent = `${fmt(k.total)} ${t("total30")}`;
+  if (current() !== "tokens") return;
+  const max = Math.max(...k.daily.map(d => d.tokens), 1), maxM = Math.max(...k.models.map(m => m.tokens), 1);
+  $("tokensBody").innerHTML = `
+    <div class="card s3"><div class="label">${t("tokens30")}</div><div class="num glow">${fmt(k.total)}</div><div class="sub">${t("total")}</div></div>
+    <div class="card s3"><div class="label">${t("today")}</div><div class="num glow">${fmt(k.today)}</div><div class="sub">tokens</div></div>
+    <div class="card s3"><div class="label">${t("cache")}</div><div class="num">${Math.round(100 * k.cache / Math.max(k.total, 1))}<small>%</small></div><div class="sub">${fmt(k.cache)} ${t("cachesub")}</div></div>
+    <div class="card s3"><div class="label">${t("cost")}</div><div class="num">$${k.cost.toFixed(2)}</div><div class="sub">${t("costsub")}</div></div>
+    <div class="card s12"><div class="label">${t("perday")}</div>
+      <div class="bars">${k.daily.map((d, i) => `<div class="bar" title="${d.date}: ${d.tokens.toLocaleString()} tokens"><i style="height:${100 * d.tokens / max}%;background:var(--cyan);opacity:${d.tokens ? 1 : .2}"></i>${i % 5 === 0 || i === k.daily.length - 1 ? `<em>${d.date.slice(3)}/${d.date.slice(0, 2)}</em>` : ""}</div>`).join("")}</div></div>
+    <div class="card s7"><div class="label"><span>${t("persession")}</span><small>${t("top10")}</small></div>
+      <table><thead><tr><th>${t("session")}</th><th class="n">Tokens</th><th class="n">${t("messages")}</th><th class="n">${t("errors")}</th></tr></thead>
+      <tbody>${k.sessions.map(s => `<tr><td>${esc(s.session)}</td><td class="n">${fmt(s.tokens)}</td><td class="n">${s.messages}</td><td class="n">${s.errors ? `<span class="tag red">${s.errors}</span>` : 0}</td></tr>`).join("")}</tbody></table></div>
+    <div class="card s5"><div class="label">${t("permodel")}</div>${k.models.length ? k.models.map(m => meter(esc(m.model), 100 * m.tokens / maxM, fmt(m.tokens), true)).join("") : `<div class="empty">${t("nomodel")}</div>`}</div>`;
+}
+
+/* ---------- automations (OpenClaw) ---------- */
+async function loadAuto() {
+  const a = await get("/api/automations");
+  if (a.error) { $("autoBody").innerHTML = unavailable(a); $("hReminders").innerHTML = unavailable(a); return; }
+  const mine = a.filter(x => !x.internal && x.enabled && x.next);
+  $("hReminders").className = ""; $("hReminders").innerHTML = mine.length
+    ? `<table><tbody>${mine.slice(0, 4).map(x => `<tr><td>${esc(x.name)}${x.channel ? ` <span class="tag">${esc(x.channel)}</span>` : ""}</td><td class="n">${esc(x.next)}</td></tr>`).join("")}</tbody></table>`
+    : `<span class="dim">${t("noreminders")}</span>`;
+  if (current() !== "automations") return;
+  $("autoBody").innerHTML = a.length ? `<table><thead><tr><th>${t("name")}</th><th>${t("when")}</th><th>${t("next")}</th><th>${t("last")}</th><th></th></tr></thead><tbody>
+    ${a.map(x => `<tr><td>${esc(x.name)} ${x.internal ? '<span class="tag">OpenClaw</span>' : ""}${x.channel ? ` <span class="tag green">${esc(x.channel)}</span>` : ""}${x.enabled ? "" : ` <span class="tag orange">${t("paused")}</span>`}</td>
+      <td class="sub">${esc(x.every)}</td><td class="n">${esc(x.next) || "—"}</td><td class="sub">${esc(x.last) || "—"} ${x.status ? `<span class="tag ${x.status === "ok" ? "green" : x.status === "error" ? "red" : ""}">${esc(x.status)}</span>` : ""}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn small" data-auto="${esc(x.id)}" data-act="run">${t("runnow")}</button>
+        <button class="btn small" data-auto="${esc(x.id)}" data-act="${x.enabled ? "pause" : "resume"}">${x.enabled ? t("pause") : t("resume")}</button></td></tr>`).join("")}</tbody></table>`
+    : `<div class="empty">${t("noauto")}</div>`;
+  $("autoBody").querySelectorAll("[data-auto]").forEach(b => b.addEventListener("click", async () => {
+    const action = b.dataset.act;
+    if (action === "run" && !confirm(t("runconfirm"))) return;
+    b.disabled = true;
+    if ((await post("/api/automation", {id: b.dataset.auto, action})).ok) toast(t(action === "run" ? "queued" : action === "pause" ? "pausedok" : "resumed"));
+    setTimeout(() => loadAuto().catch(() => {}), 800);
+  }));
+}
+
+/* ---------- sessions (OpenClaw) ---------- */
+async function loadSessions() {
+  const s = await get("/api/sessions");
+  if (s.error) { $("sesBody").innerHTML = unavailable(s); return; }
+  $("sesBody").innerHTML = `<table><thead><tr><th>${t("session")}</th><th>${t("model")}</th><th class="n">Tokens</th><th class="n">${t("lastact")}</th></tr></thead><tbody>
+    ${s.map(x => `<tr><td>${x.active ? '<i class="dot ok"></i>' : ""}${esc(x.name)}</td><td class="sub">${esc(x.model)}</td><td class="n">${fmt(x.tokens)}</td><td class="n">${esc(x.last)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+/* ---------- chat ---------- */
+let chatSig = "";
+async function loadChat() {
+  const m = await get("/api/chat");
+  if (m.error) { $("msgs").innerHTML = unavailable(m); return; }
+  const waiting = !!last.chat?.waiting;
+  const sig = JSON.stringify(m).length + ":" + waiting;
+  if (sig === chatSig) return;
+  chatSig = sig;
+  const box = $("msgs"), bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const strip = s => s.replace(/^\[[A-Z]+(-[A-Z]+)?\]\s*/, "");  // voice / panel tags
+  box.innerHTML = m.map(x => `<div class="msg ${x.role === "user" ? "user" : "assistant"}">${esc(strip(x.text))}${x.tools.map(h => `<span class="tool">${esc(h)}</span>`).join("")}<div class="meta">${x.role === "user" ? (/^\[VO[IZ]/.test(x.text) ? t("byvoice") : t("you")) : "JARVIS"}${x.time ? " · " + esc(x.time) : ""}</div></div>`).join("")
+    + `<div class="msg assistant" ${waiting ? "" : "hidden"}><span>${t("thinkingdots")}…</span></div>`;
+  if (bottom) box.scrollTop = box.scrollHeight;
+}
+$("chatForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = $("chatText").value.trim();
+  if (!text) return;
+  if ((await post("/api/chat", {text})).ok) {
+    $("chatText").value = "";
+    $("msgs").insertAdjacentHTML("beforeend", `<div class="msg user">${esc(text)}<div class="meta">${t("you")}</div></div>`);
+    $("msgs").scrollTop = $("msgs").scrollHeight; chatSig = "";
+  }
+});
+$("chatText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chatForm").requestSubmit(); } });
+
+/* ---------- logs ---------- */
+async function loadLogs() {
+  const [g, o] = await Promise.all([get("/api/logs"), get("/api/orblog")]);
+  $("logGateway").innerHTML = g.error ? unavailable(g) : g.gateway.map(l => `<div class="${esc(l.level)}"><span class="dim">${esc(l.time)}</span> ${esc(l.source)} — ${esc(l.text)}</div>`).join("");
+  $("logOrb").innerHTML = o.map(l => `<div>${esc(l)}</div>`).join("") || `<div class="dim">${t("empty")}</div>`;
+}
+
+/* ---------- start ---------- */
+go(location.hash.slice(1) || "home");
+const quiet = f => () => Promise.resolve().then(f).catch(() => {});  // while the orb restarts these fail silently and retry
+quiet(refresh)(); quiet(loadTokens)(); quiet(loadAuto)();
+setInterval(quiet(refresh), 2000);
+setInterval(quiet(() => current() === "chat" && loadChat()), 2500);
+setInterval(quiet(() => { const s = current(); if (s === "logs") return loadLogs(); if (s === "sessions") return loadSessions(); }), 6000);
+setInterval(quiet(() => Promise.all([loadAuto(), (current() === "tokens" || current() === "home") && loadTokens()])), 30000);
+</script>
+</body>
+</html>

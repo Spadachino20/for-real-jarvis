@@ -1,0 +1,6 @@
+# your own stuff never leaves your PC
+data/
+models/
+.venv/
+__pycache__/
+*.pyc
