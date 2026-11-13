@@ -523,7 +523,7 @@ def send_chat(text: str) -> str | None:
     def work() -> None:
         _chat.update(waiting=True, error="")
         try:
-            brain.ask(text)
+            brain.ask(brain.CHAT_TAG + text)
         except Exception as e:  # noqa: BLE001
             _chat["error"] = f"{type(e).__name__}: {e}"[:200]
         finally:
@@ -687,6 +687,10 @@ def start(orb: Callable[[], dict]) -> str | None:
                 elif path == "/api/chat":
                     text = str(data.get("text", "")).strip()[:4000]
                     lang = settings.load()["language"]
+                    if text.lower() in ("/new", "/reset") and kind() == "openclaw":  # a real new session, not a message
+                        gateway().call("sessions.reset", {"key": settings.load()["agent"]["session"]})
+                        _cache.pop("chat", None)
+                        return self._json({"ok": True, "error": None})
                     reply = (mode_reply(text, lang) or show_reply(text, lang, lambda _s: None)) if text else None
                     error = reply if reply else (send_chat(text) if text else "Empty message.")  # the reply shows as a toast
                 elif path == "/api/control":

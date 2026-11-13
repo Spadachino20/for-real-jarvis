@@ -159,7 +159,9 @@ def app(with_voice: bool) -> None:
             say(spoken if not s["speak_english"] else GREETING["en"][1])
 
             def speak_first(text: str) -> None:  # JARVIS talks without being asked: only when he's free
-                if turn.acquire(blocking=False):
+                if not turn.acquire(timeout=20):  # busy answering: wait a bit, then drop it
+                    print(time.strftime("%H:%M:%S"), "proactive: skipped (busy):", text[:60])
+                else:
                     try:
                         orb.show("JARVIS", text)
                         parts["ears"].speak(text)

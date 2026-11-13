@@ -46,6 +46,7 @@ def _headers(session: str | None = None) -> dict:
     return h
 
 
+CHAT_TAG = "[CHAT - typed, not spoken: markdown is fine] "  # so the agent tells typing from voice
 _history: list[dict] = []  # what the panel's chat shows for non-OpenClaw agents (and the context for plain "openai" ones)
 
 
@@ -178,7 +179,7 @@ class Brain:
         from .voice import voice_tag
         if alive():
             try:
-                reply = ask(with_screen((voice_tag() if voice else "") + text))
+                reply = ask(with_screen((voice_tag() if voice else CHAT_TAG) + text))
                 if reply:
                     return reply
             except Exception as e:  # noqa: BLE001
@@ -191,7 +192,7 @@ class Brain:
         if not alive():
             yield self._down()
             return
-        content, any_ = with_screen((voice_tag() if voice else "") + text), False
+        content, any_ = with_screen((voice_tag() if voice else CHAT_TAG) + text), False
         try:
             for sentence in sentences(ask_stream(content)):
                 any_ = True
