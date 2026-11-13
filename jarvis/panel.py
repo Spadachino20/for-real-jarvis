@@ -276,6 +276,29 @@ def mode_for(text: str) -> dict | None:
     return names[hit[0]] if hit else None
 
 
+_pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
+_YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
+
+
+def mode_reply(text: str, lang: str = "en") -> str | None:
+    """Voice/chat shortcut for modes. Returns what to answer, or None if the text isn't about a mode.
+    A mode with "confirm" asks first; the next message decides (yes runs it, anything else cancels)."""
+    es = lang == "es"
+    if _pending:
+        mode = _pending.pop("mode")
+        if time.time() - _pending.pop("at") < 60 and _YES.match(text):
+            return run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es else f"{mode.get('title') or mode['id']} mode, sir.")
+        if re.match(r"^\W*(no|nah|cancel|cancela|para|stop)\b", text, re.I):
+            return "Cancelado, señor." if es else "Cancelled, sir."
+    mode = mode_for(text)
+    if not mode:
+        return None
+    if mode.get("confirm"):
+        _pending.update(mode=mode, at=time.time())
+        return mode["confirm"]
+    return run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es else f"{mode.get('title') or mode['id']} mode, sir.")
+
+
 def run_mode(mode_id: str, leaving: bool = False) -> str | None:
     mode = next((m for m in settings.modes() if m.get("id") == mode_id), None)
     if mode is None:
@@ -469,8 +492,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                     error = run_mode(str(data.get("id", "")), bool(data.get("leave")))
                 elif path == "/api/chat":
                     text = str(data.get("text", "")).strip()[:4000]
-                    m = mode_for(text) if text else None
-                    error = run_mode(m["id"]) if m else (send_chat(text) if text else "Empty message.")
+                    reply = mode_reply(text, settings.load()["language"]) if text else None
+                    error = reply if reply else (send_chat(text) if text else "Empty message.")  # the reply shows as a toast
                 elif path == "/api/control":
                     error = control(str(data.get("action", "")), str(data.get("value", "")))
                 elif path == "/api/task":

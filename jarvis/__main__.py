@@ -59,9 +59,8 @@ def app(with_voice: bool) -> None:
             while parts["brain"] is None:
                 time.sleep(0.3)
             t0 = time.time()
-            from .panel import mode_for, run_mode
-            if mode := mode_for(text):  # modes run here, not through the agent: instant and reliable
-                reply = (run_mode(mode["id"]) or ("Modo " if lang == "es" else "") + (mode.get("title") or mode["id"]) + (", señor." if lang == "es" else " mode, sir."))
+            from .panel import mode_reply
+            if reply := mode_reply(text, lang):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)

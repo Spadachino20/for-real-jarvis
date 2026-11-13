@@ -6,6 +6,7 @@ tkinter ships with Python: zero dependencies.
 from __future__ import annotations
 
 import math
+import time
 import queue
 import tkinter as tk
 from functools import lru_cache
@@ -14,6 +15,8 @@ from typing import Callable
 BG, TRANSPARENT = "#0b1220", "#010203"
 COLORS = {"idle": "#2b6f8a", "listening": "#38e1ff", "thinking": "#ffb347",
           "speaking": "#4f9dff", "loading": "#6b7280", "mic off": "#7f1d1d"}
+from .settings import DATA
+SCREEN = DATA / "screen.jpg"  # written on every "look at my screen"
 SIZE = 128  # canvas; with the voice the rings open up to ~63 px of radius
 TEXT = {
     "en": {"mute": "Mute microphone", "unmute": "Unmute microphone", "voice": "Voice", "english": "Speak answers in English",
@@ -224,11 +227,18 @@ class Orb:
         """Drawn with PIL at 2x and scaled down: smooth rings and a glowing core (tk's canvas can't antialias)."""
         color = self.colors.get(self.state, self.colors["idle"])
         self.phase += 0.12
+        try:  # "I'm looking at your screen": two bright white flashes for 1.5 s after every capture
+            looked = time.time() - SCREEN.stat().st_mtime
+        except OSError:
+            looked = 99
+        if looked < 1.5:
+            color = _mix(color, "#ffffff", 0.5 + 0.5 * abs(math.sin(looked * math.pi * 2.6)))
         alive = self.state in ("listening", "speaking", "thinking")
         source = {"listening": "mic", "speaking": "voice"}.get(self.state)
         now = self.level(source) if self.level and source else 0.0
         self.smooth = max(now, self.smooth * 0.75)  # jumps up, eases down
-        radii = [30 + i * 8 + math.sin(self.phase * (2 if alive else 0.6) + i) * (4 if alive else 1.5)
+        flash = 8 * abs(math.sin(looked * math.pi * 2.6)) if looked < 1.5 else 0
+        radii = [flash + 30 + i * 8 + math.sin(self.phase * (2 if alive else 0.6) + i) * (4 if alive else 1.5)
                  + self.smooth * (5 + i * 4) for i in range(3)]  # rings breathe and open with the volume
         breath = 0.5 + 0.5 * math.sin(self.phase * (1.2 if alive else 0.35))  # slow pulse of the core's light
         arc = (self.phase * 90) % 360 if self.state == "thinking" else None
