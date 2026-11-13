@@ -163,6 +163,7 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 | "Work mode", "let's play F1" | your modes |
 | "Where were we?" | back to your last window and request |
 | "How's my PC?" | CPU, GPU and RAM in one line, instantly |
+| "Show me the most played games on Steam" | a table in the panel's Show section; he only says one line |
 | "Tell Ana I'm running late" | WhatsApp to a contact in `whatsapp_contacts`, after you say yes |
 | "Look into X in the background" / "…and let me know when you're done" | works on it in a separate session and tells you when it's ready |
 | "Stop" / "Jarvis, …" while he talks | cuts him off |

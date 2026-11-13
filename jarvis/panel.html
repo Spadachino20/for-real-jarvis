@@ -135,6 +135,13 @@
                       color: var(--text); font: inherit; padding: 11px 14px; }
   .compose textarea:focus { outline: none; border-color: var(--cyan); }
 
+  .md { line-height: 1.6; overflow-x: auto; } .md h2, .md h3, .md h4 { margin: 14px 0 6px; } .md p { margin: 8px 0; }
+  .md table { border-collapse: collapse; margin: 10px 0; } .md td, .md th { border: 1px solid var(--line2); padding: 6px 10px; text-align: left; }
+  .md th { color: var(--cyan); } .md td.numbar { position: relative; min-width: 140px; font-variant-numeric: tabular-nums; }
+  .md td.numbar::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: var(--w); border-radius: 4px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 35%, transparent), color-mix(in srgb, var(--cyan) 12%, transparent)); z-index: -1; }
+  .md td.numbar { isolation: isolate; } #show .md { font-size: 15px; } #show .md table { width: 100%; } .md code { font-family: var(--mono); background: var(--surface2); padding: 1px 5px; border-radius: 5px; }
+  .md ul, .md ol { padding-left: 22px; } .msg.md { overflow: visible; line-height: inherit; } .msg.md p { margin: 0 0 6px; } .msg.md p:last-of-type { margin: 0; } .md a { color: var(--cyan); }
   .log { font: 12px/1.55 var(--mono); max-height: 62vh; overflow: auto; }
   .log div { padding: 3px 0; border-top: 1px solid #0f1a2b; white-space: pre-wrap; overflow-wrap: anywhere; }
   .log .WARN { color: var(--orange); } .log .ERROR, .log .FATAL { color: var(--red); }
@@ -169,6 +176,7 @@
   <nav aria-label="Sections">
     <div class="brand"><i></i><b>__NAME__</b></div>
     <button data-go="home"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span data-t="home">Home</span></button>
+    <button data-go="show"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg><span data-t="show">Show</span></button>
     <button data-go="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span data-t="chat">Chat</span></button>
     <button data-go="modes"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg><span data-t="modes">Modes</span></button>
     <button data-go="control"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-t="control">Control</span></button>
@@ -205,6 +213,12 @@
         <div class="card s6"><div class="label" data-t="nextrem">Next reminders</div><div id="hReminders" class="empty">—</div></div>
         <div class="card s6"><div class="label"><span data-t="stability">Stability</span><small data-t="30d">30 days</small></div><div id="hCrashes" class="empty">—</div></div>
       </div>
+    </section>
+
+    <section class="section" id="show">
+      <h1 data-t="show">Show</h1>
+      <p class="lead" id="showLead" data-t="showlead">Say "show me…" and the answer appears here instead of being read aloud.</p>
+      <div class="card md" id="showBody"><div class="empty">—</div></div>
     </section>
 
     <section class="section" id="chat">
@@ -326,6 +340,7 @@ const T = {
     seslead: "Every conversation of your agent.", usage: "Usage", mostmem: "Most memory", logslead: "What happened last, newest first.",
     gatewaylog: "OpenClaw gateway", orblog: "Orb", system: "System", model: "Model", context: "Context", orb: "Orb", state: "State",
     mic: "Microphone", voice: "Voice", hotkey: "Hotkey", mode: "Mode",
+    show: "Show", showlead: "Say \"show me…\" and the answer appears here instead of being read aloud.",
     control: "Control", controllead: "Your agent's brain, your music and quick switches.", quick: "Quick actions",
     shot: "Screenshot", folder: "Open data folder", restartagent: "Restart agent", switches: "Switches",
     now: "Now using", fallbacks: "if it fails", inuse: "in use", modelset: "Model changed. New messages use it.",
@@ -356,6 +371,7 @@ const T = {
     seslead: "Cada conversación de tu agente.", usage: "Uso", mostmem: "Lo que más memoria usa", logslead: "Lo último que pasó, lo más nuevo arriba.",
     gatewaylog: "Gateway de OpenClaw", orblog: "Orbe", system: "Sistema", model: "Modelo", context: "Contexto", orb: "Orbe", state: "Estado",
     mic: "Micrófono", voice: "Voz", hotkey: "Atajo", mode: "Modo",
+    show: "Mostrar", showlead: "Decí \"mostrame…\" y la respuesta aparece acá en vez de leerse en voz alta.",
     control: "Control", controllead: "El cerebro de tu agente, tu música y ajustes rápidos.", quick: "Acciones rápidas",
     shot: "Captura de pantalla", folder: "Abrir carpeta de datos", restartagent: "Reiniciar agente", switches: "Ajustes",
     now: "Usando ahora", fallbacks: "si falla", inuse: "en uso", modelset: "Modelo cambiado. Los mensajes nuevos ya lo usan.",
@@ -418,7 +434,7 @@ function median(xs) { const o = [...xs].sort((a, b) => a - b), m = o.length >> 1
 const unavailable = r => r?.error === "openclaw_only" ? `<div class="empty">${t("openclawonly")}</div>` : r?.error === "agent_down" ? `<div class="empty">${t("agentdown")}</div>` : r?.error ? `<div class="error">${esc(r.error)}</div>` : "";
 
 /* ---------- navigation ---------- */
-const LOAD = {control: loadControl, chat: loadChat, tokens: loadTokens, automations: loadAuto, sessions: loadSessions, logs: loadLogs};
+const LOAD = {show: loadShow, control: loadControl, chat: loadChat, tokens: loadTokens, automations: loadAuto, sessions: loadSessions, logs: loadLogs};
 function go(id) {
   if (!$(id) || !$(id).classList.contains("section")) id = "home";
   document.querySelectorAll(".section").forEach(s => s.classList.toggle("on", s.id === id));
@@ -528,8 +544,48 @@ function drawStatus(d) {
   $("sendBtn").disabled = !!d.chat?.waiting;
 }
 async function refresh() {
-  try { drawStatus(await get("/api/status")); }
+  try {
+    const d = await get("/api/status"); drawStatus(d);
+    if (showId === null) showId = d.show?.id ?? 0;
+    else if (d.show && d.show.id !== showId) go("show");  // something new to look at
+  }
   catch { $("orbState").textContent = t("orboff"); $("aDot").className = "dot bad"; }
+}
+
+/* ---------- show me: a tiny markdown renderer (headings, lists, tables, bold, code, links) ---------- */
+let showId = null;
+function md(src) {
+  const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = [], lines = src.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^\s*\|/.test(l)) {  // table: header | separator | rows
+      const rows = []; while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]); i--;
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+      const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
+      const grid = body.map(cells), num = s => /^[\d\s.,%]+$/.test(s) && s.trim() ? parseFloat(s.replace(/[\s.,](?=\d{3}\b)/g, "").replace(",", ".")) : NaN;
+      const max = grid[0].map((_, c) => Math.max(...grid.slice(1).map(r => num(r[c] || "")).filter(x => !isNaN(x))));
+      // numbers get a bar behind them (relative to the column's biggest), except a first "#" column
+      out.push("<table>" + grid.map((r, n) => "<tr>" + r.map((c, k) => {
+        if (!n) return `<th>${inline(c)}</th>`;
+        const v = num(c), bar = k > 0 && !isNaN(v) && max[k] > 0 && grid.length > 2;
+        return bar ? `<td class="numbar" style="--w:${Math.round(100 * v / max[k])}%">${inline(c)}</td>` : `<td>${inline(c)}</td>`;
+      }).join("") + "</tr>").join("") + "</table>");
+    } else if (/^#{1,4}\s/.test(l)) { const n = Math.min(4, l.match(/^#+/)[0].length + 1); out.push(`<h${n}>${inline(l.replace(/^#+\s*/, ""))}</h${n}>`); }
+    else if (/^\s*([-*]|\d+\.)\s/.test(l)) {
+      const ordered = /^\s*\d+\./.test(l), items = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s/, "")); i--;
+      out.push(`<${ordered ? "ol" : "ul"}>` + items.map(x => `<li>${inline(x)}</li>`).join("") + `</${ordered ? "ol" : "ul"}>`);
+    } else if (l.trim()) out.push(`<p>${inline(l)}</p>`);
+  }
+  return out.join("");
+}
+async function loadShow() {
+  const s = await get("/api/show"); showId = s.id;
+  if (!s.id) return;
+  $("showLead").textContent = `${s.time} · ${s.title}`;
+  $("showBody").innerHTML = md(s.text);
 }
 
 /* ---------- tokens (OpenClaw) ---------- */
@@ -594,8 +650,8 @@ async function loadChat() {
   if (sig === chatSig) return;
   chatSig = sig;
   const box = $("msgs"), bottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  const strip = s => s.replace(/^\[[A-Z]+(-[A-Z]+)?\]\s*/, "");  // voice / panel tags
-  box.innerHTML = m.map(x => `<div class="msg ${x.role === "user" ? "user" : "assistant"}">${esc(strip(x.text))}${x.tools.map(h => `<span class="tool">${esc(h)}</span>`).join("")}<div class="meta">${x.role === "user" ? (/^\[VO[IZ]/.test(x.text) ? t("byvoice") : t("you")) : SHORT}${x.time ? " · " + esc(x.time) : ""}</div></div>`).join("")
+  const strip = s => s.replace(/^(\s*\[[^\]]*\]\s*)+/, "");  // [VOICE…] [PANEL] [SHOW…] [BACKGROUND…] tags
+  box.innerHTML = m.map(x => `<div class="msg md ${x.role === "user" ? "user" : "assistant"}">${x.role === "user" ? esc(strip(x.text)) : md(x.text)}${x.tools.map(h => `<span class="tool">${esc(h)}</span>`).join("")}<div class="meta">${x.role === "user" ? (/^\[VO[IZ]/.test(x.text) ? t("byvoice") : t("you")) : SHORT}${x.time ? " · " + esc(x.time) : ""}</div></div>`).join("")
     + `<div class="msg assistant" ${waiting ? "" : "hidden"}><span>${t("thinkingdots")}…</span></div>`;
   if (bottom) box.scrollTop = box.scrollHeight;
 }

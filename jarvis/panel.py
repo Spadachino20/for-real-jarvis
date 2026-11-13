@@ -438,6 +438,33 @@ def message_reply(text: str, lang: str) -> str | None:
     return f"¿Le mando a {who}: «{what}»?" if es else f"Shall I send {who}: \"{what}\"?"
 
 
+# ---------- "show me": big answers go to the panel instead of being read aloud ----------
+
+_SHOW = re.compile(r"^\W*(?:jarvis\W+)?(?:mu[eé]strame|mostrame|show me|display)\b", re.I)
+_show = {"id": 0, "title": "", "text": "", "time": "", "seen": 0.0}
+
+
+def show_reply(text: str, lang: str, done: Callable[[str], None]) -> str | None:
+    """Asks the agent for something to look at, puts it in the panel's Show section and opens it."""
+    if not _SHOW.search(text) or re.search(r"pantalla|screen", text, re.I):  # "show me my screen" is the screenshot
+        return None
+
+    def work() -> None:
+        try:
+            answer = brain.ask("[SHOW - this answer is DISPLAYED in a panel, not read aloud. Start with ONE short sentence "
+                               "to say out loud, then a blank line, then the content in markdown: tables, lists and "
+                               "headings welcome.]\n" + text, timeout=300)
+        except Exception as e:  # noqa: BLE001
+            answer = f"{type(e).__name__}: {e}"[:300]
+        spoken, _, body = answer.partition("\n\n")
+        _show.update(id=_show["id"] + 1, title=text[:120], text=body.strip() or spoken, time=time.strftime("%H:%M"))
+        if time.time() - _show["seen"] > 10:  # no panel open: open one
+            os.startfile(f"http://127.0.0.1:{PORT}/#show")
+        done(spoken.strip())
+    _in_thread(work)
+    return "Ahora se lo muestro, señor." if lang == "es" else "Putting it on screen, sir."
+
+
 _pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
 _YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
 
@@ -572,12 +599,13 @@ def control(action: str, value: str) -> str | None:
 
 
 def status(orb: Callable[[], dict]) -> dict:
+    _show["seen"] = time.time()  # an open panel polls this every few seconds
     up = _cached("agent", 5, brain.alive)
     return {"now": time.strftime("%H:%M:%S"), "agent": up, "kind": kind(), "orb": orb(),
             "main": _cached("main", 6, main_session) if up and kind() == "openclaw" else {},
             "timings": _cached("timings", 3, timings), "music": _cached("music", 8, music),
             "pc": _cached("pc", 5, pc), "crashes": _cached("crashes", 300, crashes),
-            "modes": modes(), "mode": _mode, "chat": _chat}
+            "modes": modes(), "mode": _mode, "chat": _chat, "show": {"id": _show["id"]}}
 
 
 OPENCLAW_ONLY = {"/api/tokens": ("tokens", 60, tokens), "/api/automations": ("automations", 8, automations),
@@ -633,6 +661,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                 return self._json(status(orb))
             if path == "/api/control":
                 return self._json(control_info())
+            if path == "/api/show":
+                return self._json({k: _show[k] for k in ("id", "title", "text", "time")})
             if path == "/api/chat":
                 return self._json(_cached("chat", 2, chat) if _cached("agent", 5, brain.alive) else {"error": "agent_down"})
             if path in OPENCLAW_ONLY:
@@ -656,7 +686,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                     error = run_mode(str(data.get("id", "")), bool(data.get("leave")))
                 elif path == "/api/chat":
                     text = str(data.get("text", "")).strip()[:4000]
-                    reply = mode_reply(text, settings.load()["language"]) if text else None
+                    lang = settings.load()["language"]
+                    reply = (mode_reply(text, lang) or show_reply(text, lang, lambda _s: None)) if text else None
                     error = reply if reply else (send_chat(text) if text else "Empty message.")  # the reply shows as a toast
                 elif path == "/api/control":
                     error = control(str(data.get("action", "")), str(data.get("value", "")))
