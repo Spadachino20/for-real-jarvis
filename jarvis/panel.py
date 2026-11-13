@@ -419,7 +419,7 @@ def metrics_reply(text: str, lang: str) -> str | None:
 
 
 def message_reply(text: str, lang: str) -> str | None:
-    """'decile a Peperoni que llego tarde' -> asks first, then your agent sends it. Only to settings' whatsapp_contacts."""
+    """'tell Ana I'm running late' -> asks first, then your agent sends it. Only to settings' whatsapp_contacts."""
     import difflib
     m = _MESSAGE.search(text)
     contacts = settings.load().get("whatsapp_contacts") or []
