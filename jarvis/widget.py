@@ -22,6 +22,16 @@ TEXT = {
 }
 
 
+def _mix(color: str, other: str, amount: float) -> str:
+    a, b = (tuple(int(c.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)) for c in (color, other))
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * amount) for x, y in zip(a, b))
+
+
+def palette(accent: str) -> dict:
+    """State colors from your agent's color (data/identity.json): listening = the color itself."""
+    return COLORS | {"idle": _mix(accent, BG, 0.45), "listening": accent, "speaking": _mix(accent, "#ffffff", 0.3)}
+
+
 class Orb:
     def __init__(self, on_type: Callable[[str], None], on_mute: Callable[[bool], None], on_quit: Callable[[], None],
                  voices: dict | None = None, current_voice: str = "", on_voice: Callable[[str], None] | None = None,
@@ -72,6 +82,7 @@ class Orb:
         self.menu.add_command(label=self.t["panel"], command=self._open_panel)
         self.menu.add_command(label=self.t["quit"], command=self.on_quit)
 
+        self._identity()
         self.canvas.bind("<ButtonPress-1>", self._press)
         self.canvas.bind("<B1-Motion>", self._drag)
         self.canvas.bind("<ButtonRelease-1>", self._release)
@@ -110,10 +121,18 @@ class Orb:
         self.chat.config(state="disabled")
         self.chat.see("end")
 
+    def _identity(self) -> None:
+        """Letter and color of your agent (data/identity.json), re-read every 3 s so changes show up live."""
+        from .settings import identity
+        ident = identity()
+        self.letter, self.colors = ident["letter"], palette(ident["color"])
+        self.root.title(ident["name"])
+        self.root.after(3000, self._identity)
+
     def _animate(self) -> None:
         c, m = self.canvas, SIZE / 2
         c.delete("all")
-        color = COLORS.get(self.state, COLORS["idle"])
+        color = self.colors.get(self.state, self.colors["idle"])
         self.phase += 0.12
         alive = self.state in ("listening", "speaking", "thinking")
         source = {"listening": "mic", "speaking": "voice"}.get(self.state)
@@ -127,7 +146,7 @@ class Orb:
             c.create_arc(m - 44, m - 44, m + 44, m + 44, start=(self.phase * 90) % 360, extent=70,
                          outline="#ffd08a", style="arc", width=3)
         c.create_oval(m - 22, m - 22, m + 22, m + 22, fill=BG, outline=color, width=2)
-        c.create_text(m, m, text="J", fill=color, font=("Segoe UI Semibold", 18))
+        c.create_text(m, m, text=self.letter, fill=color, font=("Segoe UI Semibold", 18))
         self.root.after(40, self._animate)
 
     def _press(self, e) -> None:

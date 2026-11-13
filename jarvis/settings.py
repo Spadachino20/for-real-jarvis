@@ -44,14 +44,14 @@ def _merge(base: dict, extra: dict) -> dict:
 
 def load() -> dict:
     try:
-        return _merge(DEFAULTS, json.loads(FILE.read_text(encoding="utf-8")))
+        return _merge(DEFAULTS, json.loads(FILE.read_text(encoding="utf-8-sig")))
     except (OSError, ValueError):
         return _merge(DEFAULTS, {})
 
 
 def save(key: str, value) -> None:
     try:
-        current = json.loads(FILE.read_text(encoding="utf-8"))
+        current = json.loads(FILE.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         current = {}
     current[key] = value
@@ -59,14 +59,36 @@ def save(key: str, value) -> None:
     FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+IDENTITY = DATA / "identity.json"  # your agent writes it (jarvis-personalize skill); delete it to go back to JARVIS
+
+
+def identity() -> dict:
+    """Who the orb shows: {"name": "F.R.I.D.A.Y.", "letter": "F", "color": "#ff8a3d"} from data/identity.json.
+    Also the short name (FRIDAY) and the words that wake it (its name + "jarvis", always)."""
+    import re
+    try:
+        ident = json.loads(IDENTITY.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        ident = {}
+    short = re.sub(r"[^A-Za-z0-9 ]", "", ident.get("name") or "JARVIS").strip() or "JARVIS"
+    color = ident.get("color") or "#38e1ff"
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        color = "#38e1ff"
+    wake = {"jarvis", short.lower(), *[w.lower() for w in ident.get("wake") or []]}
+    return {"name": ident.get("name") or "J.A.R.V.I.S.", "short": short.upper(),
+            "letter": (ident.get("letter") or short[0]).upper()[:1], "color": color, "wake": sorted(wake)}
+
+
 def modes() -> list[dict]:
     """Your modes (data/modes.json). The repo ships none: JARVIS builds them with you."""
     try:
-        return json.loads(MODES.read_text(encoding="utf-8")).get("modes", [])
+        return json.loads(MODES.read_text(encoding="utf-8-sig")).get("modes", [])
     except (OSError, ValueError):
         return []
 
 
 if __name__ == "__main__":
     assert _merge({"a": {"b": 1, "c": 2}}, {"a": {"c": 3}}) == {"a": {"b": 1, "c": 3}}
-    print("settings ok:", load()["agent"]["kind"])
+    i = identity()
+    assert i["letter"] and i["color"].startswith("#") and "jarvis" in i["wake"]
+    print("settings ok:", load()["agent"]["kind"], i["short"], i["color"])

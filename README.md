@@ -79,6 +79,18 @@ Press **Personalize JARVIS** in the panel (or say *"personalize JARVIS"*). Your 
 
 Run it again whenever you want.
 
+### Your agent's name and color on the orb
+
+Is your agent called F.R.I.D.A.Y., EDITH or ULTRON? During the interview it can put **its own name, letter and
+color** on the orb and the panel (and wake up to "Hey Friday"). It just writes one small file:
+
+```json
+// data/identity.json
+{ "name": "F.R.I.D.A.Y.", "letter": "F", "color": "#ff8a3d" }
+```
+
+Change it any time (or ask your agent to). Delete it to go back to J.A.R.V.I.S.
+
 ## Modes
 
 A mode is one phrase that sets up your PC: it opens apps, closes the ones in the way, plays a Spotify playlist

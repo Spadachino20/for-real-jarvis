@@ -11,6 +11,7 @@
 #   modes / mode <id>                           (your modes, from data\modes.json)
 param([Parameter(Mandatory = $true)][string]$Action, [string]$Arg = "", [string]$Steps = "")
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [Text.Encoding]::UTF8   # song titles and file names with accents arrive intact
 $Root = (Resolve-Path "$PSScriptRoot\..\..").Path   # the For Real J.A.R.V.I.S. folder
 $ModesFile = Join-Path $Root "data\modes.json"
 

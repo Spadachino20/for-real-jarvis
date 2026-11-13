@@ -323,11 +323,8 @@ def status(orb: Callable[[], dict]) -> dict:
 
 OPENCLAW_ONLY = {"/api/tokens": ("tokens", 60, tokens), "/api/automations": ("automations", 8, automations),
                  "/api/sessions": ("sessions", 10, sessions), "/api/logs": ("logs", 4, logs)}
-STATIC = {  # path -> (file in static/, type)
-    "/static/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
-    "/static/orb-192.png": ("orb-192.png", "image/png"), "/static/orb-512.png": ("orb-512.png", "image/png"),
-    "/static/orb-maskable.png": ("orb-maskable.png", "image/png"),
-    "/static/orb.ico": ("orb.ico", "image/x-icon"), "/favicon.ico": ("orb.ico", "image/x-icon")}
+ICONS = {"/static/orb-192.png": (192, False), "/static/orb-512.png": (512, False),
+         "/static/orb-maskable.png": (512, True), "/static/orb.ico": (0, False), "/favicon.ico": (0, False)}
 
 
 def start(orb: Callable[[], dict]) -> str | None:
@@ -354,13 +351,25 @@ def start(orb: Callable[[], dict]) -> str | None:
                 return self._json({"error": "host"}, 403)
             path = self.path.split("?")[0]
             if path in ("/", "/index.html"):
+                ident = settings.identity()
                 html = page.read_text(encoding="utf-8").replace("__KEY__", KEY).replace("__LANG__", settings.load()["language"])
+                for k in ("name", "short", "letter", "color"):
+                    html = html.replace(f"__{k.upper()}__", ident[k])
                 return self._send(200, html.encode(), "text/html; charset=utf-8")
+            if path in ICONS:  # the orb icon in your agent's letter and color
+                from .icon import draw, ico
+                ident = settings.identity()
+                if path.endswith(".ico"):
+                    return self._send(200, ico(ident["letter"], ident["color"]), "image/x-icon")
+                size, maskable = ICONS[path]
+                return self._send(200, draw(ident["letter"], ident["color"], size, maskable), "image/png")
+            if path == "/static/manifest.webmanifest":
+                ident = settings.identity()
+                manifest = json.loads((HERE / "static" / "manifest.webmanifest").read_text(encoding="utf-8"))
+                manifest.update(name=ident["name"], short_name=ident["short"])
+                return self._send(200, json.dumps(manifest).encode(), "application/manifest+json")
             if path == "/api/orblog":
                 return self._json(orb_log()[::-1])
-            if path in STATIC:
-                name, ctype = STATIC[path]
-                return self._send(200, (HERE / "static" / name).read_bytes(), ctype)
             if path == "/api/status":
                 return self._json(status(orb))
             if path == "/api/chat":

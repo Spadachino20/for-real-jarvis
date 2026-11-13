@@ -3,7 +3,7 @@ name: jarvis-personalize
 description: >
   Use when the user wants JARVIS to get to know them or to change JARVIS's personality: "personalize JARVIS",
   "get to know me", "ask me questions about me", "change your personality", "talk to me like the movie
-  JARVIS". Also when the panel says the user pressed "Personalize JARVIS".
+  JARVIS", "put your name on the orb", "make the orb orange", "go back to JARVIS". Also when the panel says the user pressed "Personalize JARVIS".
 ---
 
 # Get to know the user (For Real J.A.R.V.I.S.)
@@ -19,8 +19,29 @@ explicitly asks for it in step 1, and you show the change before saving it.
 "Before we start: do you want me to keep my current personality, or should I take on JARVIS's personality
 (the butler from the movies: calm, dry British wit, calls you 'sir')? Keeping mine is the default."
 
-- Keep (or no clear answer) → you will NOT touch your persona file. Go to step 2.
+- Keep (or no clear answer) → you will NOT touch your persona file. Go to step 1b.
 - JARVIS / a new style → note it; you'll write it at the end (step 4).
+
+## Step 1b - how the orb and the panel look (your identity)
+
+The orb shows a letter and a color, and the panel shows a name. By default they say J.A.R.V.I.S. in cyan.
+If you keep your own personality and you have your own name (F.R.I.D.A.Y., EDITH, ULTRON...), offer to
+show **your** name instead: "Want the orb to say <your name>, with an '<letter>' and my color?"
+
+With a yes, write `{{JARVIS_HOME}}\data\identity.json` (only this file, UTF-8):
+
+```json
+{ "name": "F.R.I.D.A.Y.", "letter": "F", "color": "#ff8a3d" }
+```
+
+- `name`: how you write your name. `letter`: the one in the orb (default: the first letter).
+- `color`: a `#rrggbb` that fits you; suggest one and let the user pick. Ideas: JARVIS cyan `#38e1ff`,
+  FRIDAY orange `#ff8a3d`, ULTRON red `#ff3b3b`, EDITH violet `#a78bfa`, KAREN green `#3ddc97`, gold `#ffc857`.
+- Optional `"wake": ["fri"]`: extra words that call you. Your name and "Jarvis" always work ("Hey Friday").
+- The orb changes within 3 seconds; the panel on its next reload (F5). Nothing to restart.
+- Desktop icon too (optional): run `{{JARVIS_HOME}}\.venv\Scripts\python.exe -m jarvis.icon` (writes
+  `data\orb.ico`) and set it as the icon of the desktop shortcut that points to `Restart JARVIS.cmd`.
+- To change it later, edit the file. **To go back to J.A.R.V.I.S., delete `data\identity.json`.**
 
 ## Step 2 - the interview (one question at a time, short, wait for each answer)
 
