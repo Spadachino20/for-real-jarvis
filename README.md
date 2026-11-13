@@ -12,7 +12,8 @@ Your agent keeps its brain, memory, tools and channels (WhatsApp, Telegram, Disc
 
 - 🟦 **An orb** that floats over your screen and shows what JARVIS is doing (listening, thinking, speaking).
 - 🎙️ **A voice**: say *"Hey Jarvis"* (or press **Ctrl+Shift+J**), talk, and cut him off with *"stop"*.
-- 👀 **"Look at my screen"**: he sees what you see.
+- 👀 **"Look at my screen"**: he sees what you see, only when you ask (the orb flashes white every time he looks).
+- 🧭 **"Where were we?"**: he brings back the window you were in and tells you what you'd asked him.
 - 🖥️ **PC control**: open/close apps, music, volume, files, YouTube, clipboard, dictation, PC health.
 - ⚡ **Modes** you build *with* JARVIS: one phrase sets up your PC ("work mode", "let's play").
 - 🧠 **Personalization**: JARVIS interviews you and remembers what matters.
@@ -95,6 +96,7 @@ Change it any time (or ask your agent to). Delete it to go back to J.A.R.V.I.S.
 
 A mode is one phrase that sets up your PC: it opens apps, closes the ones in the way, plays a Spotify playlist
 and can even change how JARVIS works (for example, "short technical answers" in a coding mode).
+Modes that close apps ask first ("…Continue?"), by voice too: say "yes" to go on.
 
 The repo ships **none**. Press **Create a mode** in the panel (or say *"create a work mode"*) and JARVIS asks you:
 what's it for, what to open, what to close, which playlist, and if he should behave differently. He saves it in
@@ -156,6 +158,7 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 | "Type: see you at five" | types where your cursor is |
 | "Remind me in 10 minutes to drink water" | arrives on your chat channel |
 | "Work mode", "let's play F1" | your modes |
+| "Where were we?" | back to your last window and request |
 | "Stop" / "Jarvis, …" while he talks | cuts him off |
 
 ## The panel

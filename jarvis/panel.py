@@ -276,6 +276,90 @@ def mode_for(text: str) -> dict | None:
     return names[hit[0]] if hit else None
 
 
+# ---------- "where were we?": the real window and request, not a generic summary ----------
+
+WHERE = settings.DATA / "where.json"
+_WHERE_ASK = re.compile(r"d[oó]nde (?:[ií]bamos|est[aá]bamos|quedamos|nos quedamos)|where were we", re.I)
+
+
+def _foreground() -> tuple[int, str, str]:
+    """(hwnd, title, program) of the window in front."""
+    import ctypes
+    import psutil
+    u = ctypes.windll.user32
+    hwnd, buf, pid = u.GetForegroundWindow(), ctypes.create_unicode_buffer(512), ctypes.c_ulong()
+    u.GetWindow.restype = ctypes.c_void_p
+    u.GetWindow.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+    while hwnd:  # typing in the orb puts the orb in front: take the first real window behind it
+        u.GetWindowTextW(ctypes.c_void_p(hwnd), buf, 512)
+        u.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
+        if pid.value != os.getpid() and buf.value and u.IsWindowVisible(ctypes.c_void_p(hwnd)):
+            break
+        hwnd = u.GetWindow(ctypes.c_void_p(hwnd), 2)  # GW_HWNDNEXT
+    try:
+        program = psutil.Process(pid.value).name().removesuffix(".exe")
+    except psutil.Error:
+        program = ""
+    return (hwnd or 0, buf.value, program) if hwnd else (0, "", "")
+
+
+def remember(text: str) -> None:
+    """Called on every turn with the orb: notes the window you were in and what you asked. Keeps the last 5."""
+    if _WHERE_ASK.search(text) or len(text.split()) < 3:  # "sí", "dale": not a task worth coming back to
+        return
+    try:
+        hwnd, title, program = _foreground()
+        if not title:
+            return
+        past = json.loads(WHERE.read_text(encoding="utf-8")) if WHERE.exists() else []
+        past = (past + [{"at": time.time(), "hwnd": hwnd, "title": title, "program": program, "asked": text[:200]}])[-5:]
+        WHERE.write_text(json.dumps(past, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:  # noqa: BLE001 — never break a turn for this
+        print("where.json:", e)
+
+
+def _bring_back(entry: dict) -> bool:
+    import ctypes
+    u, found = ctypes.windll.user32, []
+    PROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+    def each(hwnd, _):
+        if u.IsWindowVisible(hwnd):
+            buf = ctypes.create_unicode_buffer(512)
+            u.GetWindowTextW(hwnd, buf, 512)
+            if buf.value == entry["title"]:
+                found.append(hwnd)
+        return True
+    u.EnumWindows(PROC(each), 0)
+    hwnd = found[0] if found else (entry["hwnd"] if u.IsWindow(entry["hwnd"]) else 0)
+    if not hwnd:  # closed: open the same program again
+        if entry["program"]:
+            _ps("open", entry["program"])
+            return True
+        return False
+    u.ShowWindow(hwnd, 9)  # SW_RESTORE
+    u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)  # an Alt tap lets us take the focus
+    u.SetForegroundWindow(hwnd)
+    return True
+
+
+def where_reply(text: str, lang: str = "en") -> str | None:
+    if not _WHERE_ASK.search(text):
+        return None
+    es = lang == "es"
+    try:
+        entry = json.loads(WHERE.read_text(encoding="utf-8"))[-1]
+    except (OSError, ValueError, IndexError):
+        return "Todavía no tengo nada anotado, señor." if es else "I haven't noted anything yet, sir."
+    back = _bring_back(entry)
+    mins = round((time.time() - entry["at"]) / 60)
+    ago = (f"hace {mins} min" if es else f"{mins} min ago") if mins else ("recién" if es else "just now")
+    where = f"{entry['program']} ({entry['title'][:60]})"
+    if es:
+        return f"Estabas en {where}, {ago}. Me habías pedido: «{entry['asked']}»." + ("" if back else " La ventana ya no está.")
+    return f"You were in {where}, {ago}. You'd asked me: \"{entry['asked']}\"." + ("" if back else " That window is gone.")
+
+
 _pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
 _YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
 
