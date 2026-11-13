@@ -389,6 +389,55 @@ def background_reply(text: str, lang: str, done: Callable[[str, str], None]) -> 
     return "Entendido, señor. Le aviso cuando termine." if es else "On it, sir. I'll let you know when it's done."
 
 
+# ---------- PC metrics out loud, and WhatsApp to your contacts (with a yes first) ----------
+
+_METRICS = re.compile(r"c[oó]mo (?:va|est[aá]) (?:la|mi) (?:pc|compu)|m[eé]tricas|how(?:'s| is) (?:my|the) pc|pc stats", re.I)
+_MESSAGE = re.compile(r"(?:dec[ií]le|mand[aá]le|escrib[ií]le|avis[aá]le|tell|text|message)\s+(?:a\s+)?([\w.]+)\s*(?:que|:|,|that)?\s+(.+)", re.I)
+
+
+def gpu_percent() -> int | None:
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", r"((Get-Counter '\GPU Engine(*engtype_3D)\Utilization Percentage')"
+                        ".CounterSamples | Measure-Object CookedValue -Sum).Sum"], capture_output=True, text=True,
+                       timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
+    try:
+        return min(100, round(float(r.stdout.strip().replace(",", "."))))
+    except ValueError:
+        return None
+
+
+def metrics_reply(text: str, lang: str) -> str | None:
+    if not _METRICS.search(text):
+        return None
+    import psutil
+    cpu, ram, gpu = psutil.cpu_percent(interval=1), psutil.virtual_memory().percent, gpu_percent()
+    top = max(psutil.process_iter(["name", "memory_info"]), key=lambda p: p.info["memory_info"].rss if p.info["memory_info"] else 0)
+    name = (top.info["name"] or "?").removesuffix(".exe")
+    g = f", GPU {gpu}%" if gpu is not None else ""
+    if lang == "es":
+        return f"CPU {cpu:.0f}%{g}, RAM {ram:.0f}%. Lo que más memoria usa: {name}."
+    return f"CPU {cpu:.0f}%{g}, RAM {ram:.0f}%. Using the most memory: {name}."
+
+
+def message_reply(text: str, lang: str) -> str | None:
+    """'decile a Peperoni que llego tarde' -> asks first, then your agent sends it. Only to settings' whatsapp_contacts."""
+    import difflib
+    m = _MESSAGE.search(text)
+    contacts = settings.load().get("whatsapp_contacts") or []
+    if not m or not contacts:
+        return None
+    low = [c.lower() for c in contacts]
+    hit = difflib.get_close_matches(m.group(1).lower(), low, n=1, cutoff=0.7)
+    if not hit:
+        return None
+    who, what, es = contacts[low.index(hit[0])], m.group(2).strip().rstrip("."), lang == "es"
+
+    def send() -> str:
+        return brain.ask(f"[VOICE - the user confirmed out loud] Send this WhatsApp message to {who}, exactly as written: "
+                         f"«{what}». Then answer in one short sentence.", timeout=120)
+    _pending.update(run=send, at=time.time())
+    return f"¿Le mando a {who}: «{what}»?" if es else f"Shall I send {who}: \"{what}\"?"
+
+
 _pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
 _YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
 
@@ -398,16 +447,17 @@ def mode_reply(text: str, lang: str = "en") -> str | None:
     A mode with "confirm" asks first; the next message decides (yes runs it, anything else cancels)."""
     es = lang == "es"
     if _pending:
-        mode = _pending.pop("mode")
-        if time.time() - _pending.pop("at") < 60 and _YES.match(text):
-            return run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es else f"{mode.get('title') or mode['id']} mode, sir.")
+        go, at = _pending.pop("run"), _pending.pop("at")
+        if time.time() - at < 60 and _YES.match(text):
+            return go()
         if re.match(r"^\W*(no|nah|cancel|cancela|para|stop)\b", text, re.I):
             return "Cancelado, señor." if es else "Cancelled, sir."
     mode = mode_for(text)
     if not mode:
         return None
     if mode.get("confirm"):
-        _pending.update(mode=mode, at=time.time())
+        _pending.update(run=lambda: run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es
+                        else f"{mode.get('title') or mode['id']} mode, sir."), at=time.time())
         return mode["confirm"]
     return run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es else f"{mode.get('title') or mode['id']} mode, sir.")
 
@@ -426,6 +476,7 @@ def run_mode(mode_id: str, leaving: bool = False) -> str | None:
                 result = "JARVIS: " + brain.ask("[PANEL] " + mode["exit_message"], timeout=120)
                 _mode["active"] = None
             else:
+                _mode["game_until"] = time.time() + 4 * 3600 if mode.get("game") else 0  # proactive watches harder
                 result = _ps("mode", mode_id, timeout=120)
                 if mode.get("tell_agent"):
                     result += "\nJARVIS: " + brain.ask("[PANEL] " + mode["tell_agent"], timeout=120)

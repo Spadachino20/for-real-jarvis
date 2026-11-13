@@ -59,6 +59,12 @@ def alerts(t: dict, ram_limit: int = 92) -> dict[str, str]:
     return out
 
 
+def _gaming() -> bool:
+    """A mode with "game": true ran in the last 4 hours: RAM alerts kick in earlier (a crash mid-game costs more)."""
+    from .panel import _mode
+    return _mode.get("game_until", 0) > time.time()
+
+
 def welcome(t: dict) -> str:
     text = t["back"].format(time=time.strftime("%H:%M"))
     try:
@@ -97,7 +103,7 @@ def watch(speak: Callable[[str], None]) -> None:
                 if s.get("welcome_back", True):
                     speak(welcome(t))
             if s.get("alerts", True) and idle < away:  # no one to warn if you're away
-                for kind, text in alerts(t, s.get("ram_alert", 92)).items():
+                for kind, text in alerts(t, 85 if _gaming() else s.get("ram_alert", 92)).items():
                     if time.time() - last.get(kind, 0) > COOLDOWN:
                         last[kind] = time.time()
                         speak(text)

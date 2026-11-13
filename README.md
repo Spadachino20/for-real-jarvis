@@ -128,6 +128,7 @@ what's it for, what to open, what to close, which playlist, and if he should beh
 ```
 
 - `open`: Start-menu app names, `.lnk` / `.exe` paths, folders or URLs. `close`: process names without `.exe`.
+- `game`: `true` for game modes: for 4 hours JARVIS warns about RAM earlier (85 %), before a crash ruins the match.
 - `tell_agent` / `exit_message`: what your agent should do while the mode is on, and when you leave it.
 - `icon`: `briefcase`, `code`, `gamepad`, `car`, `shield`, `book`, `moon`, `music` or `bolt`.
 </details>
@@ -161,6 +162,8 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 | "Remind me in 10 minutes to drink water" | arrives on your chat channel |
 | "Work mode", "let's play F1" | your modes |
 | "Where were we?" | back to your last window and request |
+| "How's my PC?" | CPU, GPU and RAM in one line, instantly |
+| "Tell Ana I'm running late" | WhatsApp to a contact in `whatsapp_contacts`, after you say yes |
 | "Look into X in the background" / "…and let me know when you're done" | works on it in a separate session and tells you when it's ready |
 | "Stop" / "Jarvis, …" while he talks | cuts him off |
 
@@ -190,6 +193,7 @@ you visit can press them.
 | `microphone` / `output` | Windows default | part of the device name (`python -m jarvis --mics` picks the best mic) |
 | `hotkey` | `ctrl+shift+j` | e.g. `ctrl+shift+f9`, `pause` |
 | `interruptible` | `true` | set `false` if you use speakers instead of headphones |
+| `whatsapp_contacts` | `[]` | names JARVIS may message by voice (your agent knows their numbers); always asks first |
 | `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
 | `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
 

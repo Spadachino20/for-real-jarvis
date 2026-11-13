@@ -25,6 +25,7 @@ DEFAULTS = {
     "microphone": "",                          # part of the device name; empty = Windows default
     "output": "",                              # part of the device name; empty = Windows default
     "hotkey": "ctrl+shift+j",                  # press = saying "Jarvis"
+    "whatsapp_contacts": [],                   # names JARVIS may message by voice ("tell Ana I'm late"), always asking first
     "interruptible": True,                     # keep the mic on while JARVIS talks so you can cut him off (headphones)
     "orb_gain": 8.0,                           # how much the orb rings open with the volume
     "whisper_model": "small",                  # "large-v3-turbo" understands more in noise, slower on CPU

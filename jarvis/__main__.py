@@ -66,10 +66,10 @@ def app(with_voice: bool) -> None:
             while parts["brain"] is None:
                 time.sleep(0.3)
             t0 = time.time()
-            from .panel import background_reply, mode_reply, remember, where_reply
+            from .panel import background_reply, message_reply, metrics_reply, mode_reply, remember, where_reply
             if not (reply := where_reply(text, lang)):
                 remember(text)
-            if reply or (reply := mode_reply(text, lang) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
