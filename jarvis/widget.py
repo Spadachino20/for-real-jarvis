@@ -16,9 +16,13 @@ COLORS = {"idle": "#2b6f8a", "listening": "#38e1ff", "thinking": "#ffb347",
 SIZE = 128  # canvas; with the voice the rings open up to ~63 px of radius
 TEXT = {
     "en": {"mute": "Mute microphone", "unmute": "Unmute microphone", "voice": "Voice", "english": "Speak answers in English",
-           "panel": "Open panel", "quit": "Quit", "no_panel": "The panel didn't start: port 18790 is busy (see data/jarvis.log)."},
+           "panel": "Open panel", "quit": "Quit", "no_panel": "The panel didn't start: port 18790 is busy (see data/jarvis.log).",
+           "eleven": "ElevenLabs voice…", "eleven_ask": "Paste your ElevenLabs API key\n(free at elevenlabs.io → Developers → API Keys).\nIt stays on this PC.",
+           "eleven_ok": "Done: I'm using ElevenLabs now. Pick another voice in Voice."},
     "es": {"mute": "Silenciar micrófono", "unmute": "Activar micrófono", "voice": "Voz", "english": "Contestar hablando en inglés",
-           "panel": "Abrir panel", "quit": "Salir", "no_panel": "El panel no arrancó: el puerto 18790 está ocupado (ver data/jarvis.log)."},
+           "panel": "Abrir panel", "quit": "Salir", "no_panel": "El panel no arrancó: el puerto 18790 está ocupado (ver data/jarvis.log).",
+           "eleven": "Voz de ElevenLabs…", "eleven_ask": "Pegá tu clave de API de ElevenLabs\n(gratis en elevenlabs.io → Developers → API Keys).\nQueda solo en esta PC.",
+           "eleven_ok": "Listo: ahora uso ElevenLabs. Podés elegir otra voz en Voz."},
 }
 
 
@@ -76,6 +80,7 @@ class Orb:
             for name, code in voices.items():
                 sub.add_radiobutton(label=name, value=code, variable=self.voice, command=lambda c=code: on_voice(c))
             self.menu.add_cascade(label=self.t["voice"], menu=sub)
+            self.menu.add_command(label=self.t["eleven"], command=lambda: self._elevenlabs(on_voice))
             self.english = tk.BooleanVar(value=english)
             self.menu.add_checkbutton(label=self.t["english"], variable=self.english,
                                       command=lambda: on_english(self.english.get()))
@@ -178,6 +183,22 @@ class Orb:
         self.menu.entryconfig(0, label=self.t["unmute"] if self.muted else self.t["mute"])
         self.on_mute(self.muted)
         self.state = "mic off" if self.muted else "idle"
+
+    def _elevenlabs(self, on_voice: Callable[[str], None]) -> None:
+        """Paste your free ElevenLabs key: it gets checked, saved in data/ and the voice switches to it."""
+        import threading
+        from tkinter import simpledialog
+        key = simpledialog.askstring("ElevenLabs", self.t["eleven_ask"], show="*", parent=self.root)
+        if not key:
+            return
+
+        def check() -> None:
+            from .voice import set_elevenlabs_key
+            problem = set_elevenlabs_key(key)
+            self.show("JARVIS", problem or self.t["eleven_ok"])
+            if not problem:
+                on_voice("elevenlabs:Daniel")  # saves it and plays a sample
+        threading.Thread(target=check, daemon=True).start()
 
     def _open_panel(self) -> None:
         import webbrowser

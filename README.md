@@ -128,6 +128,20 @@ what's it for, what to open, what to close, which playlist, and if he should beh
 - `icon`: `briefcase`, `code`, `gamepad`, `car`, `shield`, `book`, `moon`, `music` or `bolt`.
 </details>
 
+## A better voice (free ElevenLabs key)
+
+JARVIS speaks with a local voice (Kokoro) out of the box. For a much more natural one, use ElevenLabs:
+their free plan includes API access with a monthly allowance of characters.
+
+1. Create a free account at [elevenlabs.io](https://elevenlabs.io).
+2. Go to **Developers → API Keys → Create API Key**. Give it access to **Text to Speech** and **Voices (read)**,
+   then copy the key.
+3. Right-click the orb → **ElevenLabs voice…** → paste the key → OK.
+
+JARVIS checks the key, saves it only on your PC (`data/elevenlabs.key`), switches to the "Daniel" voice and says
+hello. Pick another one in right-click → **Voice**. If the key ever runs out or there's no internet, he falls
+back to the local voice by himself. To stop using it, pick a non-ElevenLabs voice (or delete the file).
+
 ## What you can say
 
 | | |

@@ -69,6 +69,13 @@ Skip anything you already know (check your memory and notes first). Let them ski
   in its home; others: your system prompt or persona notes) and ask for a yes before saving.
 - Prefer adding a "Voice and style" section over rewriting the file. Never delete their old notes without asking.
 
+## A better voice
+
+If the user asks for a better or more natural voice (or dislikes the default one), explain the free ElevenLabs
+option in 3 short steps: free account at elevenlabs.io → Developers → API Keys → Create (Text to Speech +
+Voices read) → right-click the orb → "ElevenLabs voice…" → paste. Never ask them to paste the key to you in the
+chat: the orb's dialog keeps it on their PC.
+
 ## Finish
 
 One line: what you'll remember, and that they can run this again any time ("personalize JARVIS").

@@ -182,6 +182,29 @@ def _elevenlabs_headers(name: str) -> dict | None:
     return headers
 
 
+def set_elevenlabs_key(key: str, voice_name: str = "Daniel") -> str | None:
+    """Checks the key against ElevenLabs, saves it in data/elevenlabs.key (git-ignored) and switches the voice.
+    Returns None if it worked, or what went wrong. The key is never printed or logged."""
+    import httpx
+    key = key.strip()
+    if len(key) < 20:
+        return "That doesn't look like an ElevenLabs key."
+    try:
+        r = httpx.get("https://api.elevenlabs.io/v2/voices", params={"search": voice_name},
+                      headers={"xi-api-key": key}, timeout=15)
+    except httpx.HTTPError:
+        return "Couldn't reach ElevenLabs. Check your internet connection."
+    if r.status_code in (401, 403):
+        return "ElevenLabs rejected that key (or it lacks the 'Voices' read permission)."
+    if r.status_code != 200:
+        return f"ElevenLabs answered {r.status_code}. Try again in a minute."
+    settings.DATA.mkdir(exist_ok=True)
+    ELEVENLABS_KEY.write_text(key, encoding="utf-8")
+    _voice_id.clear()
+    settings.save("voice", f"elevenlabs:{voice_name}")
+    return None
+
+
 def _speak_elevenlabs(text: str, name: str) -> bool:
     """Streams the voice as it arrives (starts in ~0.5 s). False = couldn't: Kokoro speaks instead."""
     import httpx
