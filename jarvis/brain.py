@@ -35,8 +35,8 @@ def token() -> str:
     return ""
 
 
-def _headers() -> dict:
-    a, h = _agent(), {}
+def _headers(session: str | None = None) -> dict:
+    a, h = _agent() | ({"session": session} if session else {}), {}
     if t := token():
         h["Authorization"] = f"Bearer {t}"
     if a["kind"] == "openclaw":
@@ -84,10 +84,11 @@ def with_screen(text: str) -> str | list:
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + data}}]
 
 
-def ask(content, timeout: int = 300) -> str:
+def ask(content, timeout: int = 300, session: str | None = None) -> str:
+    """session: another conversation of your agent (background tasks), so the main one stays free."""
     import httpx
     a = _agent()
-    r = httpx.post(a["url"].rstrip("/") + "/v1/chat/completions", timeout=timeout, headers=_headers(),
+    r = httpx.post(a["url"].rstrip("/") + "/v1/chat/completions", timeout=timeout, headers=_headers(session),
                    json={"model": a["model"], "messages": _messages(content)})
     r.raise_for_status()
     answer = (r.json()["choices"][0]["message"]["content"] or "").strip()

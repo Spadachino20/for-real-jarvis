@@ -13,6 +13,8 @@ Your agent keeps its brain, memory, tools and channels (WhatsApp, Telegram, Disc
 - 🟦 **An orb** that floats over your screen and shows what JARVIS is doing (listening, thinking, speaking).
 - 🎙️ **A voice**: say *"Hey Jarvis"* (or press **Ctrl+Shift+J**), talk, and cut him off with *"stop"*.
 - 👀 **"Look at my screen"**: he sees what you see, only when you ask (the orb flashes white every time he looks).
+- 🔔 **He speaks first**: warns you when RAM, a disk or the battery is in trouble, and welcomes you back when
+  you sit down again (the time, where you were, your next reminder).
 - 🧭 **"Where were we?"**: he brings back the window you were in and tells you what you'd asked him.
 - 🖥️ **PC control**: open/close apps, music, volume, files, YouTube, clipboard, dictation, PC health.
 - ⚡ **Modes** you build *with* JARVIS: one phrase sets up your PC ("work mode", "let's play").
@@ -159,6 +161,7 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 | "Remind me in 10 minutes to drink water" | arrives on your chat channel |
 | "Work mode", "let's play F1" | your modes |
 | "Where were we?" | back to your last window and request |
+| "Look into X in the background" / "…and let me know when you're done" | works on it in a separate session and tells you when it's ready |
 | "Stop" / "Jarvis, …" while he talks | cuts him off |
 
 ## The panel
@@ -187,6 +190,8 @@ you visit can press them.
 | `microphone` / `output` | Windows default | part of the device name (`python -m jarvis --mics` picks the best mic) |
 | `hotkey` | `ctrl+shift+j` | e.g. `ctrl+shift+f9`, `pause` |
 | `interruptible` | `true` | set `false` if you use speakers instead of headphones |
+| `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
+| `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
 
 Everything personal (settings, modes, keys, logs) lives in `data/`, which never leaves your PC.
 

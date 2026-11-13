@@ -53,16 +53,23 @@ def app(with_voice: bool) -> None:
     parts = {"brain": None, "ears": None}
     turn = threading.Lock()  # one answer at a time
 
+    def finished(summary: str, full: str) -> None:
+        """A background task is done: say the summary when JARVIS is free; the whole answer goes to the orb's chat."""
+        with turn:
+            orb.show("JARVIS", full)
+            if parts["ears"]:
+                parts["ears"].speak(summary)
+
     def think(text: str, voice: bool) -> None:
         with turn:
             orb.set_state("thinking")
             while parts["brain"] is None:
                 time.sleep(0.3)
             t0 = time.time()
-            from .panel import mode_reply, remember, where_reply
+            from .panel import background_reply, mode_reply, remember, where_reply
             if not (reply := where_reply(text, lang)):
                 remember(text)
-            if reply or (reply := mode_reply(text, lang)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := mode_reply(text, lang) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
@@ -143,6 +150,16 @@ def app(with_voice: bool) -> None:
             text, spoken = GREETING[lang]
             orb.show("JARVIS", text.format(key=s["hotkey"].title()))
             say(spoken if not s["speak_english"] else GREETING["en"][1])
+
+            def speak_first(text: str) -> None:  # JARVIS talks without being asked: only when he's free
+                if turn.acquire(blocking=False):
+                    try:
+                        orb.show("JARVIS", text)
+                        parts["ears"].speak(text)
+                    finally:
+                        turn.release()
+            from .proactive import watch
+            threading.Thread(target=watch, args=(speak_first,), daemon=True).start()
             parts["ears"].loop()
         else:
             orb.set_state("idle")

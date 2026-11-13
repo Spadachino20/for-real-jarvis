@@ -360,6 +360,35 @@ def where_reply(text: str, lang: str = "en") -> str | None:
     return f"You were in {where}, {ago}. You'd asked me: \"{entry['asked']}\"." + ("" if back else " That window is gone.")
 
 
+# ---------- background tasks: "look into X and let me know" ----------
+
+_BACKGROUND = re.compile(r"en segundo plano|avis[aá]me cuando (?:termines|est[eé]|lo tengas)|in the background|let me know when (?:you're|it's) done", re.I)
+_bg = {"busy": False}
+
+
+def background_reply(text: str, lang: str, done: Callable[[str, str], None]) -> str | None:
+    """Runs the task in another session of your agent and calls done(spoken summary, full answer) when it's ready."""
+    if not _BACKGROUND.search(text):
+        return None
+    es = lang == "es"
+    if _bg["busy"]:
+        return "Todavía estoy con la tarea anterior, señor." if es else "I'm still on the previous task, sir."
+    _bg["busy"] = True
+
+    def work() -> None:
+        try:
+            answer = brain.ask("[BACKGROUND TASK - the user is doing something else. Start with ONE short sentence that "
+                               "sums up the result (it will be read aloud), then a blank line, then the details.]\n" + text,
+                               timeout=1800, session="agent:main:background" if kind() == "openclaw" else "for-real-jarvis-background")
+            done(answer.split("\n\n")[0].strip(), answer)
+        except Exception as e:  # noqa: BLE001
+            done(("No pude terminar la tarea: " if es else "I couldn't finish the task: ") + type(e).__name__, str(e)[:300])
+        finally:
+            _bg["busy"] = False
+    _in_thread(work)
+    return "Entendido, señor. Le aviso cuando termine." if es else "On it, sir. I'll let you know when it's done."
+
+
 _pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
 _YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
 
