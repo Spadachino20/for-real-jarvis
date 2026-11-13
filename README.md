@@ -176,7 +176,7 @@ you visit can press them.
 |---|---|---|
 | `agent.kind` | `openclaw` | `openclaw`, `hermes` or `openai` (any OpenAI-compatible agent) |
 | `agent.url` / `agent.model` | OpenClaw's | Hermes: `http://127.0.0.1:8642` / `hermes-agent` |
-| `agent.token` | read from OpenClaw | Hermes: your `API_SERVER_KEY` |
+| `agent.token` | read from OpenClaw | Hermes: your `API_SERVER_KEY` (the installer creates one) |
 | `agent.restart_command` | — | a command to bring your agent back if it goes down |
 | `language` | `en` | `en` or `es`: what you speak, and the panel's language |
 | `speak_english` | `true` | spoken answers in English even if you speak Spanish |

@@ -90,16 +90,22 @@ if ($kind -eq "openclaw") {
 } else {
     $envFile = Join-Path $hermes ".env"
     $envText = if (Test-Path $envFile) { Get-Content $envFile -Raw } else { "" }
-    if ($envText -notmatch 'API_SERVER_ENABLED\s*=\s*true') {
-        Say "JARVIS talks to Hermes through its API server, which is off (API_SERVER_ENABLED in $envFile)."
-        if (Ask "Turn it on (127.0.0.1:8642, local only)?") {
-            Add-Content $envFile "`nAPI_SERVER_ENABLED=true`nAPI_SERVER_HOST=127.0.0.1`nAPI_SERVER_PORT=8642"
+    $key = if ($envText -match 'API_SERVER_KEY\s*=\s*(\S+)') { $Matches[1] } else { "" }
+    if ($envText -notmatch 'API_SERVER_ENABLED\s*=\s*true' -or -not $key) {
+        Say "JARVIS talks to Hermes through its API server (API_SERVER_* in $envFile), which isn't fully on."
+        if (Ask "Turn it on (127.0.0.1:8642, local only, with a random key)?") {
+            $add = ""
+            if ($envText -notmatch 'API_SERVER_ENABLED\s*=\s*true') { $add += "`nAPI_SERVER_ENABLED=true" }
+            if (-not $key) {  # Hermes requires a key even on localhost
+                $key = -join ((48..57) + (97..122) | Get-Random -Count 40 | % { [char]$_ })
+                $add += "`nAPI_SERVER_KEY=$key"
+            }
+            Add-Content $envFile $add
             Say "On. Restart 'hermes gateway' so it takes effect."
         }
     }
-    $key = if ($envText -match 'API_SERVER_KEY\s*=\s*(\S+)') { $Matches[1] } else { "" }
-    $agent = @{ kind = "hermes"; url = "http://127.0.0.1:8642"; model = "hermes-agent"; token = $key }
-    $skillsDir = Join-Path $hermes "skills"
+    $agent = @{ kind = "hermes"; url = "http://127.0.0.1:8642"; model = "hermes-agent"; token = $key; session = "for-real-jarvis" }
+    $skillsDir = Join-Path $hermes "skills\jarvis"   # Hermes: ~/.hermes/skills/<category>/<skill>/SKILL.md
 }
 if (-not (Test-Path "data\settings.json")) {
     $lang = if ($Yes) { "en" } else { (Read-Host "  Language you'll speak to JARVIS: en (English) or es (Spanish)? [en]").Trim().ToLower() }

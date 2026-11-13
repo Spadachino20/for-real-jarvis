@@ -58,15 +58,16 @@ Skip anything you already know (check your memory and notes first). Let them ski
 
 ## Step 3 - save what you learned (add, never replace)
 
-- OpenClaw: add a section to `USER.md` in your workspace. Hermes or others: your user profile / memory.
+- OpenClaw: add a section to `USER.md` in your workspace. Hermes: `~/.hermes/memories/USER.md` (keep it short:
+  Hermes caps that file at ~1,375 characters, so add only the essentials). Others: your user profile / memory.
 - Title it `## From the For Real J.A.R.V.I.S. interview (<date>)`, short bullets, in the user's language.
 - If something contradicts an older note, ask which one is right.
 - Show what you'll add, ask "Save it?", and only save with a yes.
 
 ## Step 4 - only if they asked for a new personality in step 1
 
-- Show the exact text you'd add or change in your persona file (OpenClaw: `SOUL.md`; Hermes: `SOUL.md`
-  in its home; others: your system prompt or persona notes) and ask for a yes before saving.
+- Show the exact text you'd add or change in your persona file (OpenClaw: `SOUL.md` in your workspace;
+  Hermes: `~/.hermes/SOUL.md`; others: your system prompt or persona notes) and ask for a yes before saving.
 - Prefer adding a "Voice and style" section over rewriting the file. Never delete their old notes without asking.
 
 ## A better voice

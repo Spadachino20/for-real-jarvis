@@ -25,9 +25,10 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
    powershell -ExecutionPolicy Bypass -File "$HOME\for-real-jarvis\install.ps1"
    ```
    - OpenClaw: it turns on `gateway.http.endpoints.chatCompletions` (local only). **Restart your gateway** after.
-   - Hermes: it turns on the API server (`API_SERVER_ENABLED=true`, 127.0.0.1:8642). **Restart `hermes gateway`** after.
+   - Hermes: it turns on the API server in `~/.hermes/.env` (`API_SERVER_ENABLED=true` plus a random
+     `API_SERVER_KEY`, which Hermes requires even on localhost; 127.0.0.1:8642). **Restart `hermes gateway`** after.
 5. Reload your skills (or start a new session) so you see `jarvis-pc`, `jarvis-modes`, `jarvis-personalize`
-   and `jarvis-reminders`.
+   and `jarvis-reminders` (OpenClaw: `<workspace>/skills/`; Hermes: `~/.hermes/skills/jarvis/`).
 6. Start it: `"$HOME\for-real-jarvis\Start JARVIS.cmd"`. Check `data\jarvis.log` shows no errors, or run
    `.venv\Scripts\python.exe -m jarvis --selftest` from the repo folder.
 7. Tell the user, in two or three lines: say "Hey Jarvis" or press Ctrl+Shift+J; right-click the orb → Open

@@ -41,14 +41,16 @@ def _headers() -> dict:
         h["Authorization"] = f"Bearer {t}"
     if a["kind"] == "openclaw":
         h["x-openclaw-session-key"] = a["session"]
+    elif a["kind"] == "hermes":  # Hermes keeps the conversation itself when given a session id
+        h["X-Hermes-Session-Id"] = a["session"] if a["session"] != "agent:main:main" else "for-real-jarvis"
     return h
 
 
-_history: list[dict] = []  # only for agents without server-side sessions
+_history: list[dict] = []  # what the panel's chat shows for non-OpenClaw agents (and the context for plain "openai" ones)
 
 
 def _messages(content) -> list[dict]:
-    if _agent()["kind"] == "openclaw":
+    if _agent()["kind"] in ("openclaw", "hermes"):  # the server already has the conversation
         return [{"role": "user", "content": content}]
     return _history[-8:] + [{"role": "user", "content": content}]
 
