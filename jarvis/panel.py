@@ -8,6 +8,7 @@ the page served here, plus Host/Origin checks: a website open in your browser ca
 from __future__ import annotations
 
 import json
+import os
 import re
 import secrets
 import subprocess
@@ -254,6 +255,27 @@ def _in_thread(f: Callable[[], None]) -> None:
     threading.Thread(target=f, daemon=True).start()
 
 
+_MODE_WORDS = {"modo", "mode", "juguemos", "jugar", "jugamos", "lets", "let's", "play", "activa", "activar", "pon", "pone", "poné", "el", "la", "de", "a", "al", "jarvis", "hey", "on"}
+
+
+def mode_for(text: str) -> dict | None:
+    """'modo forza' / 'juguemos f1' / 'work mode' -> that mode, right here: no agent, no tokens, can't fail halfway."""
+    import difflib
+    import unicodedata
+    plain = unicodedata.normalize("NFKD", text.lower()).encode("ascii", "ignore").decode()
+    words = re.findall(r"[a-z0-9']+", plain)
+    if not words or len(words) > 6 or {"salir", "sal", "exit", "leave", "quit", "crea", "crear", "create"} & set(words) or not {"modo", "mode", "juguemos", "jugamos", "play"} & set(words):
+        return None
+    rest = " ".join(w for w in words if w not in _MODE_WORDS)
+    names = {}
+    for m in settings.modes():
+        for n in (m.get("id"), m.get("title")):
+            if n:
+                names[unicodedata.normalize("NFKD", n.lower()).encode("ascii", "ignore").decode()] = m
+    hit = difflib.get_close_matches(rest, names, n=1, cutoff=0.6)
+    return names[hit[0]] if hit else None
+
+
 def run_mode(mode_id: str, leaving: bool = False) -> str | None:
     mode = next((m for m in settings.modes() if m.get("id") == mode_id), None)
     if mode is None:
@@ -311,6 +333,56 @@ def automation(job_id: str, action: str) -> str | None:
 
 
 # ---------- server ----------
+
+# ---------- control: model, music, quick actions, settings ----------
+
+OPENCLAW_JSON = Path.home() / ".openclaw" / "openclaw.json"
+TOGGLES = ("speak_english", "interruptible")
+
+
+def models() -> dict:
+    """OpenClaw: the primary model and the ones its allowlist lets you pick. Others: read-only."""
+    if kind() != "openclaw":
+        return {"current": settings.load()["agent"].get("model", ""), "allowed": [], "fallbacks": [], "can_set": False}
+    d = json.loads(OPENCLAW_JSON.read_text(encoding="utf-8-sig"))["agents"]["defaults"]
+    model = d.get("model", {})
+    allowed = d.get("modelPolicy", {}).get("allow") or sorted(k for k in d.get("models", {}) if "*" not in k)
+    return {"current": model.get("primary", ""), "fallbacks": model.get("fallbacks", []), "allowed": allowed, "can_set": True}
+
+
+def control_info() -> dict:
+    s = settings.load()
+    return {"models": _cached("models", 10, models), "settings": {k: bool(s[k]) for k in TOGGLES},
+            "restart": bool(s["agent"].get("restart_command"))}
+
+
+def control(action: str, value: str) -> str | None:
+    """Buttons of the Control section. Returns an error, or None."""
+    if action == "model":
+        info = models()
+        if not info["can_set"] or value not in info["allowed"]:
+            return "That model isn't in your agent's allowed list."
+        r = subprocess.run(["openclaw.cmd", "config", "set", "agents.defaults.model.primary", value], capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=subprocess.CREATE_NO_WINDOW)
+        _cache.pop("models", None); _cache.pop("main", None)
+        return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[-240:] or "openclaw config set failed."
+    if action == "music" and value in ("play", "pause", "next", "previous"):
+        _in_thread(lambda: (_ps("music", value), _cache.pop("music", None)))
+    elif action == "volume" and value in ("up", "down", "mute"):
+        _ps("volume", value)
+    elif action == "setting" and value in TOGGLES:
+        settings.save(value, not settings.load()[value])
+    elif action == "restart_agent":
+        brain._last_restart = 0.0
+        return None if brain.restart() else "Set agent.restart_command in data/settings.json first."
+    elif action == "screenshot":
+        _in_thread(lambda: os.startfile(_ps("screenshot")))
+    elif action == "folder":
+        os.startfile(settings.DATA)
+    else:
+        return "Unknown action."
+    return None
+
 
 def status(orb: Callable[[], dict]) -> dict:
     up = _cached("agent", 5, brain.alive)
@@ -372,6 +444,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                 return self._json(orb_log()[::-1])
             if path == "/api/status":
                 return self._json(status(orb))
+            if path == "/api/control":
+                return self._json(control_info())
             if path == "/api/chat":
                 return self._json(_cached("chat", 2, chat) if _cached("agent", 5, brain.alive) else {"error": "agent_down"})
             if path in OPENCLAW_ONLY:
@@ -395,7 +469,10 @@ def start(orb: Callable[[], dict]) -> str | None:
                     error = run_mode(str(data.get("id", "")), bool(data.get("leave")))
                 elif path == "/api/chat":
                     text = str(data.get("text", "")).strip()[:4000]
-                    error = send_chat(text) if text else "Empty message."
+                    m = mode_for(text) if text else None
+                    error = run_mode(m["id"]) if m else (send_chat(text) if text else "Empty message.")
+                elif path == "/api/control":
+                    error = control(str(data.get("action", "")), str(data.get("value", "")))
                 elif path == "/api/task":
                     task = TASKS.get(str(data.get("task", "")))
                     error = send_chat(task) if task else "Unknown task."

@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import queue
 import tkinter as tk
+from functools import lru_cache
 from typing import Callable
 
 BG, TRANSPARENT = "#0b1220", "#010203"
@@ -33,7 +34,84 @@ def _mix(color: str, other: str, amount: float) -> str:
 
 def palette(accent: str) -> dict:
     """State colors from your agent's color (data/identity.json): listening = the color itself."""
-    return COLORS | {"idle": _mix(accent, BG, 0.45), "listening": accent, "speaking": _mix(accent, "#ffffff", 0.3)}
+    return COLORS | {"idle": _mix(accent, BG, 0.2), "listening": accent, "speaking": _mix(accent, "#ffffff", 0.3)}
+
+
+def _rgb(color: str) -> tuple[int, int, int]:
+    return tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+
+
+@lru_cache(maxsize=16)
+def _core(color: str, letter: str):
+    """The still part, at 2x: dark disc, colored light from the center, the core ring and the letter."""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    S, c, accent = SIZE * 2, SIZE, _rgb(color)
+    disc = Image.new("RGBA", (S, S), (0, 0, 0, 0))  # no background: you see through the orb, only lines
+    ImageDraw.Draw(disc).ellipse((4, 4, S - 5, S - 5), fill=_rgb(BG) + (2,))  # invisible, but catches the mouse
+    inside = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(inside).ellipse((c - 42, c - 42, c + 42, c + 42), fill=255)
+    glow = Image.new("RGBA", (S, S), _rgb(BG) + (255,))  # the core: dark, with colored light from its center
+    ImageDraw.Draw(glow).ellipse((c - 34, c - 34, c + 34, c + 34), fill=accent + (255,))
+    glow = glow.filter(ImageFilter.GaussianBlur(18))
+    glow.putalpha(inside)
+    top = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(top)
+    d.ellipse((c - 44, c - 44, c + 44, c + 44), fill=tuple(round(a * .28 + b * .72) for a, b in zip(accent, _rgb(BG))) + (255,),
+              outline=accent + (255,), width=4)
+    try:
+        font = ImageFont.truetype("C:/Windows/Fonts/seguisb.ttf", 46)
+    except OSError:
+        font = ImageFont.load_default(46)
+    d.text((c, c + 2), (letter or "J")[:1].upper(), font=font, fill=tuple(round(a * .7 + 255 * .3) for a in accent) + (255,), anchor="mm")
+    halo = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(halo).text((c, c + 2), (letter or "J")[:1].upper(), font=font, fill=accent + (255,), anchor="mm")
+    top = Image.alpha_composite(halo.filter(ImageFilter.GaussianBlur(5)), top)
+    return disc, glow, top
+
+
+def _frame(color: str, letter: str, radii: list[float], breath: float, arc: float | None):
+    from PIL import Image, ImageDraw
+    disc, glow, top = _core(color, letter)
+    S, c, accent = SIZE * 2, SIZE, _rgb(color)
+    img = disc.copy()
+    img.alpha_composite(Image.blend(Image.new("RGBA", glow.size, _rgb(BG) + (0,)), glow, 0.6 + 0.4 * breath))
+    rings = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(rings)
+    for i, r in enumerate(radii):
+        r = min(r * 2, S / 2 - 6)
+        k = (1, .8, .6)[i]  # outer rings dimmer, but solid: the window can't do half-transparent pixels
+        d.ellipse((c - r, c - r, c + r, c + r), outline=tuple(round(x * k + y * (1 - k)) for x, y in zip(accent, _rgb(BG))) + (255,),
+                  width=(4, 3, 3)[i])
+    if arc is not None:  # thinking: spinning arc
+        d.arc((c - 88, c - 88, c + 88, c + 88), start=arc, end=arc + 70, fill=(255, 208, 138, 255), width=6)
+    img.alpha_composite(rings)
+    img.alpha_composite(top)
+    return img.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def _layered(hwnd: int, img, x: int, y: int) -> None:
+    """Shows an RGBA image as the window itself, with real per-pixel transparency (Windows layered window)."""
+    import ctypes
+    from ctypes import wintypes as w
+    from PIL import Image, ImageChops
+    u, g, P = ctypes.windll.user32, ctypes.windll.gdi32, ctypes.c_void_p
+    for fn, args in ((u.GetDC, [P]), (g.CreateCompatibleDC, [P]), (g.SelectObject, [P, P]), (g.DeleteObject, [P]),
+                     (g.DeleteDC, [P]), (u.ReleaseDC, [P, P]), (g.CreateDIBSection, [P, P, w.UINT, P, P, w.DWORD]),
+                     (u.UpdateLayeredWindow, [P, P, P, P, P, P, w.DWORD, P, w.DWORD])):
+        fn.argtypes, fn.restype = args, P
+    r, gr, b, a = img.split()
+    data = Image.merge("RGBA", [ImageChops.multiply(c, a) for c in (b, gr, r)] + [a]).tobytes()  # premultiplied BGRA
+    width, height = img.size
+    header = (ctypes.c_int32 * 10)(40, width, -height, 1 | (32 << 16), 0, 0, 0, 0, 0, 0)  # BITMAPINFOHEADER
+    screen = u.GetDC(None)
+    mem = g.CreateCompatibleDC(screen)
+    bits = P()
+    bitmap = g.CreateDIBSection(screen, header, 0, ctypes.byref(bits), None, 0)
+    ctypes.memmove(bits, data, len(data))
+    old = g.SelectObject(mem, bitmap)
+    u.UpdateLayeredWindow(hwnd, screen, ctypes.byref(w.POINT(x, y)), ctypes.byref(w.SIZE(width, height)), mem,
+                          ctypes.byref(w.POINT(0, 0)), 0, (ctypes.c_ubyte * 4)(0, 0, 255, 1), 2)  # ULW_ALPHA
+    g.SelectObject(mem, old); g.DeleteObject(bitmap); g.DeleteDC(mem); u.ReleaseDC(None, screen)
 
 
 class Orb:
@@ -57,7 +135,15 @@ class Orb:
         r.geometry(f"+{r.winfo_screenwidth() - SIZE - 380}+40")
 
         self.canvas = tk.Canvas(r, width=SIZE, height=SIZE, bg=TRANSPARENT, highlightthickness=0)
-        self.canvas.grid(row=0, column=0, sticky="n")
+        self.canvas.grid(row=0, column=0, sticky="n")  # an empty, see-through spot: the orb floats over it
+        self.glass = tk.Toplevel(r)  # the orb itself: a layered window, so its edges are soft over anything
+        self.glass.overrideredirect(True)
+        self.glass.attributes("-topmost", True)
+        self.glass.update_idletasks()
+        import ctypes
+        self.hwnd = ctypes.windll.user32.GetParent(self.glass.winfo_id())
+        ex = ctypes.windll.user32.GetWindowLongW(self.hwnd, -20)
+        ctypes.windll.user32.SetWindowLongW(self.hwnd, -20, ex | 0x80000 | 0x80)  # WS_EX_LAYERED | WS_EX_TOOLWINDOW
         self.label = tk.Label(r, text="", fg="#cfe8ff", bg=BG, font=("Segoe UI", 10),
                               wraplength=280, justify="left", padx=10, pady=6)
         self.label.grid(row=0, column=1, sticky="w", padx=(6, 0))
@@ -88,10 +174,10 @@ class Orb:
         self.menu.add_command(label=self.t["quit"], command=self.on_quit)
 
         self._identity()
-        self.canvas.bind("<ButtonPress-1>", self._press)
-        self.canvas.bind("<B1-Motion>", self._drag)
-        self.canvas.bind("<ButtonRelease-1>", self._release)
-        self.canvas.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
+        self.glass.bind("<ButtonPress-1>", self._press)
+        self.glass.bind("<B1-Motion>", self._drag)
+        self.glass.bind("<ButtonRelease-1>", self._release)
+        self.glass.bind("<Button-3>", lambda e: self.menu.tk_popup(e.x_root, e.y_root))
         self._animate()
         self._drain()
 
@@ -135,23 +221,18 @@ class Orb:
         self.root.after(3000, self._identity)
 
     def _animate(self) -> None:
-        c, m = self.canvas, SIZE / 2
-        c.delete("all")
+        """Drawn with PIL at 2x and scaled down: smooth rings and a glowing core (tk's canvas can't antialias)."""
         color = self.colors.get(self.state, self.colors["idle"])
         self.phase += 0.12
         alive = self.state in ("listening", "speaking", "thinking")
         source = {"listening": "mic", "speaking": "voice"}.get(self.state)
         now = self.level(source) if self.level and source else 0.0
         self.smooth = max(now, self.smooth * 0.75)  # jumps up, eases down
-        for i in range(3):  # rings breathe and open with the volume (outer ones more)
-            radius = 30 + i * 8 + math.sin(self.phase * (2 if alive else 0.6) + i) * (4 if alive else 1.5) \
-                + self.smooth * (5 + i * 4)
-            c.create_oval(m - radius, m - radius, m + radius, m + radius, outline=color, width=2 if i == 0 else 1)
-        if self.state == "thinking":  # spinning arc
-            c.create_arc(m - 44, m - 44, m + 44, m + 44, start=(self.phase * 90) % 360, extent=70,
-                         outline="#ffd08a", style="arc", width=3)
-        c.create_oval(m - 22, m - 22, m + 22, m + 22, fill=BG, outline=color, width=2)
-        c.create_text(m, m, text=self.letter, fill=color, font=("Segoe UI Semibold", 18))
+        radii = [30 + i * 8 + math.sin(self.phase * (2 if alive else 0.6) + i) * (4 if alive else 1.5)
+                 + self.smooth * (5 + i * 4) for i in range(3)]  # rings breathe and open with the volume
+        breath = 0.5 + 0.5 * math.sin(self.phase * (1.2 if alive else 0.35))  # slow pulse of the core's light
+        arc = (self.phase * 90) % 360 if self.state == "thinking" else None
+        _layered(self.hwnd, _frame(color, self.letter, radii, breath, arc), self.canvas.winfo_rootx(), self.canvas.winfo_rooty())
         self.root.after(40, self._animate)
 
     def _press(self, e) -> None:
@@ -164,7 +245,7 @@ class Orb:
             self.root.geometry(f"+{wx + e.x_root - x0}+{wy + e.y_root - y0}")
 
     def _release(self, e) -> None:
-        if self._moved:
+        if getattr(self, "_moved", False):
             return
         if self.chatbox.winfo_ismapped():
             self.chatbox.grid_remove()

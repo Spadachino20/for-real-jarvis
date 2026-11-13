@@ -35,7 +35,10 @@ function MediaState($s) {
 
 function CloseThese([string[]]$names, [datetime]$since = [datetime]::MinValue) {
     # closes the processes a mode lists. Steam exits cleanly through its URL: killing it makes it relaunch.
-    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since })
+    # never our own parents: the agent may run on a CLI with the same name (e.g. claude); killing it kills this mode
+    $mine = @(); $id = $PID
+    while ($id -and $mine -notcontains $id) { $mine += $id; $id = (Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue).ParentProcessId }
+    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since -and $mine -notcontains $_.Id })
     if (-not $p) { return }
     if ($p | ? ProcessName -eq steam) { Start-Process "steam://exit" }
     $p | ? ProcessName -notmatch '^steam' | Stop-Process -Force -ErrorAction SilentlyContinue

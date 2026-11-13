@@ -171,6 +171,7 @@
     <button data-go="home"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span data-t="home">Home</span></button>
     <button data-go="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span data-t="chat">Chat</span></button>
     <button data-go="modes"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg><span data-t="modes">Modes</span></button>
+    <button data-go="control"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-t="control">Control</span></button>
     <button data-go="tokens"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span data-t="tokens">Tokens</span></button>
     <button data-go="automations"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span data-t="automations">Automations</span></button>
     <button data-go="sessions"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-t="sessions">Sessions</span></button>
@@ -224,6 +225,33 @@
       <div class="grid">
         <div class="card s12"><div class="label" data-t="pick">Pick a mode</div><div class="modes" id="bigModes"></div></div>
         <div class="card s12"><div class="label"><span data-t="lastresult">Last result</span><small id="modeTime"></small></div><div class="result" id="modeResult"></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="control">
+      <h1 data-t="control">Control</h1>
+      <p class="lead" data-t="controllead">Your agent's brain, your music and quick switches.</p>
+      <div class="grid">
+        <div class="card s12"><div class="label"><span data-t="model">Model</span><small id="cFall"></small></div>
+          <div class="sub" id="cNow" style="margin-bottom:10px"></div><div class="modes" id="cModels"></div></div>
+        <div class="card s6"><div class="label" data-t="music">Music</div><div id="cMusic" class="sub" style="margin-bottom:10px">—</div>
+          <div class="actions">
+            <button class="btn" data-c="music" data-v="previous" aria-label="Previous">⏮</button>
+            <button class="btn main" data-c="music" data-v="toggle" aria-label="Play / pause">⏯</button>
+            <button class="btn" data-c="music" data-v="next" aria-label="Next">⏭</button>
+            <button class="btn" data-c="volume" data-v="down" aria-label="Volume down">🔉</button>
+            <button class="btn" data-c="volume" data-v="up" aria-label="Volume up">🔊</button>
+            <button class="btn" data-c="volume" data-v="mute" aria-label="Mute">🔇</button>
+          </div></div>
+        <div class="card s6"><div class="label" data-t="quick">Quick actions</div>
+          <div class="actions">
+            <button class="btn" data-c="screenshot" data-t="shot">Screenshot</button>
+            <button class="btn" data-c="folder" data-t="folder">Open data folder</button>
+            <button class="btn" data-c="restart_agent" id="cRestart" data-t="restartagent">Restart agent</button>
+            <button class="btn" data-task="personalize" data-t="personalize">Personalize JARVIS</button>
+            <button class="btn" data-task="create-mode" data-t="newmode">Create a mode</button>
+          </div></div>
+        <div class="card s12"><div class="label" data-t="switches">Switches</div><div id="cSettings"></div></div>
       </div>
     </section>
 
@@ -298,6 +326,11 @@ const T = {
     seslead: "Every conversation of your agent.", usage: "Usage", mostmem: "Most memory", logslead: "What happened last, newest first.",
     gatewaylog: "OpenClaw gateway", orblog: "Orb", system: "System", model: "Model", context: "Context", orb: "Orb", state: "State",
     mic: "Microphone", voice: "Voice", hotkey: "Hotkey", mode: "Mode",
+    control: "Control", controllead: "Your agent's brain, your music and quick switches.", quick: "Quick actions",
+    shot: "Screenshot", folder: "Open data folder", restartagent: "Restart agent", switches: "Switches",
+    now: "Now using", fallbacks: "if it fails", inuse: "in use", modelset: "Model changed. New messages use it.",
+    nomodelset: "Your agent picks its model itself (Hermes: run 'hermes model').",
+    speak_english: "Answer out loud in English", interruptible: "Let me cut him off while he talks (headphones)",
     morning: "Good morning, sir.", afternoon: "Good afternoon, sir.", evening: "Good evening, sir.",
     online: "Online", down: "Down", working: "working", nomodes: "No modes yet. Create your first one with JARVIS: he asks you what to open, close and play.",
     newmodehint: "JARVIS asks you a few questions", exit: "Exit", exithint: "JARVIS goes back to normal", running: "Running", done: "Done:", failed: "Error in",
@@ -323,6 +356,11 @@ const T = {
     seslead: "Cada conversación de tu agente.", usage: "Uso", mostmem: "Lo que más memoria usa", logslead: "Lo último que pasó, lo más nuevo arriba.",
     gatewaylog: "Gateway de OpenClaw", orblog: "Orbe", system: "Sistema", model: "Modelo", context: "Contexto", orb: "Orbe", state: "Estado",
     mic: "Micrófono", voice: "Voz", hotkey: "Atajo", mode: "Modo",
+    control: "Control", controllead: "El cerebro de tu agente, tu música y ajustes rápidos.", quick: "Acciones rápidas",
+    shot: "Captura de pantalla", folder: "Abrir carpeta de datos", restartagent: "Reiniciar agente", switches: "Ajustes",
+    now: "Usando ahora", fallbacks: "si falla", inuse: "en uso", modelset: "Modelo cambiado. Los mensajes nuevos ya lo usan.",
+    nomodelset: "Tu agente elige su modelo solo (Hermes: corré 'hermes model').",
+    speak_english: "Responder en voz alta en inglés", interruptible: "Poder cortarlo mientras habla (con auriculares)",
     morning: "Buenos días, señor.", afternoon: "Buenas tardes, señor.", evening: "Buenas noches, señor.",
     online: "En línea", down: "Caído", working: "trabajando", nomodes: "Todavía no tenés modos. Creá el primero con JARVIS: te pregunta qué abrir, cerrar y qué música poner.",
     newmodehint: "JARVIS te hace unas preguntas", exit: "Salir de", exithint: "JARVIS vuelve a lo normal", running: "Corriendo", done: "Listo:", failed: "Error en",
@@ -364,6 +402,10 @@ function toast(text) { const e = $("toast"); e.textContent = text; e.classList.a
 async function get(path) { const r = await fetch(path, {cache: "no-store"}); return r.json(); }
 async function post(path, data) {
   const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-Jarvis-Key": KEY}, body: JSON.stringify(data)});
+  if (r.status === 403) {  // the orb restarted: new key. Reload (keeping what you typed) and the next click works.
+    try { sessionStorage.setItem("draft", $("chatText").value); } catch (e) {}
+    toast("…"); location.reload(); return {ok: false};
+  }
   const j = await r.json().catch(() => ({ok: false, error: "bad answer"}));
   if (!j.ok) toast(j.error || "Failed.");
   return j;
@@ -376,7 +418,7 @@ function median(xs) { const o = [...xs].sort((a, b) => a - b), m = o.length >> 1
 const unavailable = r => r?.error === "openclaw_only" ? `<div class="empty">${t("openclawonly")}</div>` : r?.error === "agent_down" ? `<div class="empty">${t("agentdown")}</div>` : r?.error ? `<div class="error">${esc(r.error)}</div>` : "";
 
 /* ---------- navigation ---------- */
-const LOAD = {chat: loadChat, tokens: loadTokens, automations: loadAuto, sessions: loadSessions, logs: loadLogs};
+const LOAD = {control: loadControl, chat: loadChat, tokens: loadTokens, automations: loadAuto, sessions: loadSessions, logs: loadLogs};
 function go(id) {
   if (!$(id) || !$(id).classList.contains("section")) id = "home";
   document.querySelectorAll(".section").forEach(s => s.classList.toggle("on", s.id === id));
@@ -429,6 +471,7 @@ function drawModeState(m, modes) {
 function drawStatus(d) {
   last = d;
   const o = d.orb || {}, p = d.pc || {}, mn = d.main || {}, mu = d.music || {};
+  lastMusic = mu; if ($("cMusic")) $("cMusic").textContent = mu.title ? `${mu.state === "playing" ? "▶" : "⏸"} ${mu.artist} — ${mu.title}` : (mu.text || "—");
   $("clock").textContent = d.now;
   const h = +d.now.slice(0, 2);
   $("hello").textContent = t(h < 12 ? "morning" : h < 19 ? "afternoon" : "evening");
@@ -569,6 +612,29 @@ $("chatForm").addEventListener("submit", async e => {
 $("chatText").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chatForm").requestSubmit(); } });
 
 /* ---------- logs ---------- */
+/* ---------- control: model, music, quick actions, switches ---------- */
+const short = m => m.split("/").pop();
+async function loadControl() {
+  const d = await get("/api/control"), m = d.models || {};
+  $("cNow").textContent = m.error ? m.error : `${t("now")}: ${m.current || "—"}`;
+  $("cFall").textContent = (m.fallbacks || []).length ? `${t("fallbacks")}: ${m.fallbacks.map(short).join(" → ")}` : "";
+  $("cModels").innerHTML = m.can_set ? m.allowed.map(x => `<button class="btn${x === m.current ? " main" : ""}" data-model="${esc(x)}" title="${esc(x)}">${esc(short(x))}${x === m.current ? " · " + t("inuse") : ""}</button>`).join("")
+                                     : `<div class="empty">${t("nomodelset")}</div>`;
+  $("cModels").querySelectorAll("[data-model]").forEach(b => b.onclick = async () => {
+    b.disabled = true; if ((await post("/api/control", {action: "model", value: b.dataset.model})).ok) toast(t("modelset")); loadControl();
+  });
+  $("cRestart").hidden = !d.restart;
+  $("cSettings").innerHTML = Object.entries(d.settings || {}).map(([k, on]) =>
+    `<label class="fact"><span>${t(k)}</span><input type="checkbox" data-set="${k}" ${on ? "checked" : ""}></label>`).join("");
+  $("cSettings").querySelectorAll("[data-set]").forEach(c => c.onchange = () => post("/api/control", {action: "setting", value: c.dataset.set}));
+}
+let lastMusic = {};
+document.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", async () => {
+  let v = b.dataset.v || "";
+  if (v === "toggle") v = lastMusic.state === "playing" ? "pause" : "play";
+  b.disabled = true; await post("/api/control", {action: b.dataset.c, value: v}); b.disabled = false;
+}));
+
 async function loadLogs() {
   const [g, o] = await Promise.all([get("/api/logs"), get("/api/orblog")]);
   $("logGateway").innerHTML = g.error ? unavailable(g) : g.gateway.map(l => `<div class="${esc(l.level)}"><span class="dim">${esc(l.time)}</span> ${esc(l.source)} — ${esc(l.text)}</div>`).join("");
@@ -583,6 +649,7 @@ setInterval(quiet(refresh), 2000);
 setInterval(quiet(() => current() === "chat" && loadChat()), 2500);
 setInterval(quiet(() => { const s = current(); if (s === "logs") return loadLogs(); if (s === "sessions") return loadSessions(); }), 6000);
 setInterval(quiet(() => Promise.all([loadAuto(), (current() === "tokens" || current() === "home") && loadTokens()])), 30000);
+try { const d = sessionStorage.getItem("draft"); if (d) { $("chatText").value = d; sessionStorage.removeItem("draft"); go("chat"); toast(t("send") + " ↵"); } } catch (e) {}
 </script>
 </body>
 </html>

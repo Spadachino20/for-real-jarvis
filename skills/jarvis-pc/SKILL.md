@@ -44,7 +44,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{{JARVIS_HOME}}\skills\jarv
   In PowerShell the text goes in single quotes: double any `'` inside it.
 - Modes: run `mode <id>` and report its line in one sentence. If the output contains
   `INSTRUCTION FOR THE AGENT: …`, follow that instruction from now on (until the user leaves the mode).
-  No mode with that name? Offer to create it with the jarvis-modes skill. Never invent a mode.
+  The name comes from speech recognition and may be misheard ("força" = forza, "f uno" = f1): pick the
+  closest mode id from `modes` and run it. Only if none is close, offer to create it with the jarvis-modes skill. Never invent a mode.
 - On social networks only open and look: never post, comment, like or send messages without the user's
   explicit permission for that specific message.
 - Closing a program with unsaved work (Word, editors): ask first.

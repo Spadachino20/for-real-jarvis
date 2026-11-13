@@ -330,7 +330,7 @@ class Ears:
         self._last_audio = time.time()
         return AudioToTextRecorder(
             model=s["whisper_model"], language=_lang(), device="cpu", compute_type="int8", beam_size=1,
-            initial_prompt=f"{settings.identity()['short'].title()}, {s['vocabulary']}", input_device_index=index, spinner=False,
+            initial_prompt=f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,
             silero_sensitivity=0.4, silero_backend="official_onnx", silero_deactivity_detection=True,
             webrtc_sensitivity=3, post_speech_silence_duration=0.55, min_length_of_recording=0.4,
             on_recording_start=self._starts, on_recording_stop=self._stops, on_recorded_chunk=self._audio,

@@ -160,7 +160,7 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 
 ## The panel
 
-`http://127.0.0.1:18790` (right-click the orb → Open panel). Sections: **Home** (orb, summary, modes),
+`http://127.0.0.1:18790` (right-click the orb → Open panel). Sections: **Home** (orb, summary, modes), **Control** (switch model, music, quick actions, switches),
 **Chat** (the same conversation as the orb), **Modes**, **Tokens** (30 days, per day, session and model),
 **Automations** (run / pause), **Sessions**, **PC** and **Logs**.
 
