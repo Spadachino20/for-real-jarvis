@@ -89,9 +89,10 @@ def app(with_voice: bool) -> None:
                 time.sleep(0.3)
             t0 = time.time()
             from .panel import show_reply, background_reply, message_reply, metrics_reply, mode_reply, remember, where_reply
-            if not (reply := where_reply(text, lang)):
+            spoken = "en" if voice and settings.load()["speak_english"] else lang  # local replies in the language he speaks
+            if not (reply := where_reply(text, spoken)):
                 remember(text)
-            if reply or (reply := quick_reply(text, lang) or mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or show_reply(text, lang, said) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := quick_reply(text, spoken) or mode_reply(text, spoken) or metrics_reply(text, spoken) or message_reply(text, spoken) or show_reply(text, spoken, said) or background_reply(text, spoken, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
