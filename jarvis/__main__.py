@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import re
 import threading
 
 from . import settings
@@ -23,6 +24,20 @@ else:
 
 GREETING = {"en": ('Online, sir. Say "Hey Jarvis" or press {key}.', "Online, sir."),
             "es": ('En línea, señor. Diga "oye Jarvis" o apriete {key}.', "En línea, señor.")}
+
+
+def quick_reply(text: str, lang: str) -> str | None:
+    """Questions JARVIS answers himself, instantly, without asking the agent."""
+    import datetime
+    t, now, es = text.lower(), datetime.datetime.now(), lang == "es"
+    days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    if re.search(r"\b(qu[eé] hora( es)?|what time( is it)?|the time)\b", t):
+        return f"Son las {now:%H:%M}, señor." if es else f"It's {now:%H:%M}, sir."
+    if re.search(r"\b(qu[eé] (d[ií]a|fecha) es( hoy)?|what('?s| is) (the date|today)|what day is it)\b", t):
+        return (f"Hoy es {days[now.weekday()]} {now.day} de {months[now.month - 1]}, señor." if es
+                else f"Today is {now:%A, %B} {now.day}, sir.")
+    return None
 
 
 def selftest() -> None:
@@ -76,7 +91,7 @@ def app(with_voice: bool) -> None:
             from .panel import show_reply, background_reply, message_reply, metrics_reply, mode_reply, remember, where_reply
             if not (reply := where_reply(text, lang)):
                 remember(text)
-            if reply or (reply := mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or show_reply(text, lang, said) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := quick_reply(text, lang) or mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or show_reply(text, lang, said) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
@@ -86,16 +101,22 @@ def app(with_voice: bool) -> None:
             if voice and parts["ears"]:
                 # the voice starts with the first sentence; the rest keeps arriving in parallel
                 pieces = parts["brain"].answer_by_sentence(text, voice=True)
+                got_first = threading.Event()
+
+                def maybe_filler() -> None:  # only if the agent is slow: a quick answer needs no "one moment"
+                    if not got_first.wait(0.6):
+                        parts["ears"].filler()
+                threading.Thread(target=maybe_filler, daemon=True).start()
                 first = next(pieces, "")
+                got_first.set()
                 t1, rest = time.time(), []
-                worker = threading.Thread(target=lambda: rest.extend(pieces), daemon=True)
-                worker.start()
 
-                def the_rest() -> str:
-                    worker.join()
-                    return " ".join(rest)
+                def the_rest():  # each sentence is spoken as soon as it arrives
+                    for sentence in pieces:
+                        rest.append(sentence)
+                        yield sentence
 
-                parts["ears"].speak(first, then=the_rest)
+                parts["ears"].speak(first, then=the_rest())
                 orb.show("JARVIS", " ".join([first, *rest]).strip())
             else:
                 reply = parts["brain"].answer(text, voice=voice)
@@ -108,6 +129,31 @@ def app(with_voice: bool) -> None:
             heard = getattr(parts["ears"], "last_transcription", 0.0) if voice else 0.0
             print(time.strftime("%H:%M:%S"), f"timings {'voice' if voice else 'chat'}: "
                   f"understand {heard:.1f}s | agent {t1 - t0:.1f}s | speak {time.time() - t1:.1f}s")
+
+    def clapped() -> None:
+        """Clap-clap (or snap-snap): straight into work mode, no agent in between."""
+        want = settings.load().get("clap_mode", "auto")
+        modes = settings.modes()
+        if want == "auto":
+            mode = next((m for m in modes if re.search(r"work|trabaj", f"{m.get('id', '')} {m.get('title', '')}", re.I)), None)
+        else:
+            mode = next((m for m in modes if m.get("id") == want), None)
+        es = lang == "es"
+        if not turn.acquire(blocking=False):  # busy answering: ignore the claps
+            return
+        try:
+            print(time.strftime("%H:%M:%S"), "clap-clap:", mode and mode.get("id"))
+            if mode is None:
+                reply = ("No tengo un modo trabajo todavía, señor. Pídame que lo creemos." if es
+                         else "I don't have a work mode yet, sir. Ask me to set one up.")
+            else:
+                from .panel import run_mode
+                title = mode.get("title") or mode["id"]
+                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")
+            orb.show("JARVIS", reply)
+            parts["ears"].speak(reply)
+        finally:
+            turn.release()
 
     def heard(text: str) -> None:
         orb.show(you, text)
@@ -128,11 +174,15 @@ def app(with_voice: bool) -> None:
 
     def pick_voice(code: str) -> None:
         settings.save("voice", code)
+        from .voice import warm_fillers
+        threading.Thread(target=warm_fillers, daemon=True).start()
         english = settings.load()["speak_english"] or lang == "en"
         threading.Thread(target=say, args=(SAMPLE["en" if english else lang],), daemon=True).start()
 
     def pick_english(on: bool) -> None:
         settings.save("speak_english", on)
+        from .voice import warm_fillers
+        threading.Thread(target=warm_fillers, daemon=True).start()
         threading.Thread(target=say, args=(SAMPLE["en" if on else lang],), daemon=True).start()
 
     you = "You" if lang == "en" else "Vos"
@@ -154,9 +204,13 @@ def app(with_voice: bool) -> None:
             from .voice import Ears, hotkey_listener
             parts["ears"] = Ears(heard, orb.set_state)
             threading.Thread(target=hotkey_listener, args=(parts["ears"].by_hotkey,), daemon=True).start()
+            from .voice import ClapDetector
+            parts["ears"].claps = ClapDetector(clapped)
             text, spoken = GREETING[lang]
             orb.show("JARVIS", text.format(key=s["hotkey"].title()))
             say(spoken if not s["speak_english"] else GREETING["en"][1])
+            from .voice import warm_fillers
+            threading.Thread(target=warm_fillers, daemon=True).start()  # "Right away, sir" ready in memory
 
             def speak_first(text: str) -> None:  # JARVIS talks without being asked: only when he's free
                 if not turn.acquire(timeout=20):  # busy answering: wait a bit, then drop it

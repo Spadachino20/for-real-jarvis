@@ -28,7 +28,12 @@ DEFAULTS = {
     "whatsapp_contacts": [],                   # names JARVIS may message by voice ("tell Ana I'm late"), always asking first
     "interruptible": True,                     # keep the mic on while JARVIS talks so you can cut him off (headphones)
     "orb_gain": 8.0,                           # how much the orb rings open with the volume
-    "whisper_model": "small",                  # "large-v3-turbo" understands more in noise, slower on CPU
+    "whisper_model": "small",                  # "base" = faster on CPU; with a GPU "large-v3-turbo" is fast and understands more
+    "stt_device": "auto",                      # "auto" uses an NVIDIA GPU if there is one, "cpu" / "cuda" to force it
+    "silence_sec": 0.45,                       # silence before JARVIS takes your sentence as finished (lower = faster, may cut you off)
+    "clap_mode": "auto",                       # mode run by two claps / snaps: "auto" = your work mode, "" = off, or a mode id
+    "clap_threshold": 0.35,                    # how loud a clap must be (0-1); raise it if JARVIS reacts to noises
+    "fillers": True,                           # "Right away, sir" while the agent thinks, so it feels instant
     "vocabulary": "Jarvis, Spotify, YouTube, Chrome, WhatsApp, OpenClaw, Claude.",
     # How your agent knows a message came from the mic. Self-explaining, so no agent setup is needed.
     "voice_tags": {"spoken": "[VOICE: read aloud - answer in 1-2 short sentences, no lists or markdown] ",
