@@ -155,6 +155,18 @@ def _play(audio, sr: int) -> None:
             time.sleep(0.04)
 
 
+def _device() -> str:
+    """"cuda" with an NVIDIA card (e.g. RTX 5060) and CUDA installed, else "cpu". settings "stt_device" forces it."""
+    want = settings.load().get("stt_device", "auto")
+    if want != "auto":
+        return want
+    try:
+        import ctranslate2
+        return "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+    except Exception:  # noqa: BLE001
+        return "cpu"
+
+
 def _style(voice: str):
     """"bm_lewis" or a mix "bm_george:0.5+bm_lewis:0.5" (averaged style vector)."""
     if "+" not in voice and ":" not in voice:
@@ -164,6 +176,16 @@ def _style(voice: str):
 
 ELEVENLABS_KEY = settings.DATA / "elevenlabs.key"   # paste your key there; never committed
 _voice_id: dict[str, str] = {}
+_http = None  # one connection kept open: saves the TLS handshake (~0.1-0.3 s) on every sentence
+
+
+def _client():
+    global _http
+    if _http is None:
+        import httpx
+        _http = httpx.Client(base_url="https://api.elevenlabs.io", timeout=30, http2=False,
+                             limits=httpx.Limits(keepalive_expiry=300))
+    return _http
 
 
 def _elevenlabs_headers(name: str) -> dict | None:
@@ -175,8 +197,7 @@ def _elevenlabs_headers(name: str) -> dict | None:
         return None
     headers = {"xi-api-key": key}
     if name not in _voice_id:  # find the voice by name in your account
-        import httpx
-        voices = httpx.get("https://api.elevenlabs.io/v2/voices", params={"search": name},
+        voices = _client().get("/v2/voices", params={"search": name},
                            headers=headers, timeout=15).raise_for_status().json()["voices"]
         _voice_id[name] = next(v["voice_id"] for v in voices if v["name"].split(" ")[0] == name)
     return headers
@@ -207,14 +228,13 @@ def set_elevenlabs_key(key: str, voice_name: str = "Daniel") -> str | None:
 
 def _speak_elevenlabs(text: str, name: str) -> bool:
     """Streams the voice as it arrives (starts in ~0.5 s). False = couldn't: Kokoro speaks instead."""
-    import httpx
     try:
         headers = _elevenlabs_headers(name)
         if headers is None:
             return False
-        with httpx.stream("POST", f"https://api.elevenlabs.io/v1/text-to-speech/{_voice_id[name]}/stream",
-                          params={"output_format": "pcm_24000"}, headers=headers, timeout=30,
-                          json={"text": text, "model_id": "eleven_flash_v2_5"}) as r:
+        with _client().stream("POST", f"/v1/text-to-speech/{_voice_id[name]}/stream",
+                              params={"output_format": "pcm_24000", "optimize_streaming_latency": 3},
+                              headers=headers, json={"text": text, "model_id": "eleven_flash_v2_5"}) as r:
             r.raise_for_status()
             with _audio_lock, sd.RawOutputStream(samplerate=24000, channels=1, dtype="int16", device=output()) as out:
                 rest = b""
@@ -252,6 +272,63 @@ def say(text: str) -> None:
         audio, sr = _tts.create(text, voice=_style(voice), speed=SPEED, lang="en-gb" if english else "es")
     if not _cut.is_set():
         _play(audio, sr)
+
+
+FILLERS = {
+    "en": ["Right away, sir.", "One moment, sir.", "On it, sir.", "Certainly, sir.", "Just a second, sir."],
+    "es": ["Enseguida, señor.", "Un momento, señor.", "En ello, señor.", "Ahora mismo, señor.", "Déjeme ver, señor."],
+}
+_filler_audio: dict[tuple[str, str], tuple] = {}  # (voice, text) -> (audio, sample rate), made once
+
+
+def _synth(text: str, voice: str, english: bool):
+    """Audio without playing it (for the cached fillers)."""
+    global _tts
+    if voice.startswith("elevenlabs:"):
+        name = voice.split(":", 1)[1]
+        headers = _elevenlabs_headers(name)
+        if headers:
+            r = _client().post(f"/v1/text-to-speech/{_voice_id[name]}", params={"output_format": "pcm_24000"},
+                               headers=headers, json={"text": text, "model_id": "eleven_flash_v2_5"})
+            r.raise_for_status()
+            return np.frombuffer(r.content[:len(r.content) // 2 * 2], np.int16).astype(np.float32) / 32768, 24000
+        voice = "bm_lewis" if english else "em_alex"
+    with _tts_lock:
+        if _tts is None:
+            from kokoro_onnx import Kokoro
+            _tts = Kokoro(str(settings.ROOT / "models/kokoro-v1.0.int8.onnx"), str(settings.ROOT / "models/voices-v1.0.bin"))
+        return _tts.create(text, voice=_style(voice), speed=SPEED, lang="en-gb" if english else "es")
+
+
+def _filler_setup():
+    s = settings.load()
+    english = s["speak_english"] or s["language"] == "en"
+    return s["voice"], english, FILLERS["en" if english else "es"]
+
+
+def warm_fillers() -> None:
+    """Prepare the fillers in the background (at start and after changing voice)."""
+    if not settings.load().get("fillers", True):
+        return
+    voice, english, texts = _filler_setup()
+    for text in texts:
+        if (voice, text) not in _filler_audio:
+            try:
+                _filler_audio[(voice, text)] = _synth(text, voice, english)
+            except Exception as e:  # noqa: BLE001 — no filler is fine
+                print("couldn't prepare filler:", type(e).__name__, str(e)[:120])
+                return
+
+
+def filler() -> None:
+    """Says a short "Right away, sir" while the agent thinks. Only from the cache: never waits on the network."""
+    import random
+    if not settings.load().get("fillers", True):
+        return
+    voice, _, texts = _filler_setup()
+    ready = [_filler_audio[(voice, t)] for t in texts if (voice, t) in _filler_audio]
+    if ready and not _cut.is_set():
+        _play(*random.choice(ready))
 
 
 def beep(freq: int = 880, sec: float = 0.1) -> None:
@@ -329,10 +406,10 @@ class Ears:
             print(f"Warning: microphone '{s['microphone']}' not found, using the Windows default.")
         self._last_audio = time.time()
         return AudioToTextRecorder(
-            model=s["whisper_model"], language=_lang(), device="cpu", compute_type="int8", beam_size=1,
+            model=s["whisper_model"], language=_lang(), device=_device(), compute_type="float16" if _device() == "cuda" else "int8", beam_size=1,
             initial_prompt=f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,
             silero_sensitivity=0.4, silero_backend="official_onnx", silero_deactivity_detection=True,
-            webrtc_sensitivity=3, post_speech_silence_duration=0.55, min_length_of_recording=0.4,
+            webrtc_sensitivity=3, post_speech_silence_duration=s.get("silence_sec", 0.45), min_length_of_recording=0.4,
             on_recording_start=self._starts, on_recording_stop=self._stops, on_recorded_chunk=self._audio,
             no_log_file=True)
 
@@ -414,6 +491,20 @@ class Ears:
                 self.mute(False)
             self._awake_until = time.time() + FOLLOW_UP_SEC  # you can follow up without the name
             self.state("listening")
+
+    def filler(self) -> None:
+        """Short "Right away, sir" while the agent thinks, without hearing himself."""
+        interruptible = settings.load()["interruptible"]
+        _cut.clear()
+        self.speaking, self._spoke_from = True, time.time()
+        if not interruptible:
+            self.mute(True)
+        try:
+            filler()
+        finally:
+            self.speaking, self._spoke_until = False, time.time()
+            if not interruptible:
+                self.mute(False)
 
     def loop(self) -> None:
         self.state("idle")

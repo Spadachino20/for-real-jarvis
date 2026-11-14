@@ -86,7 +86,14 @@ def app(with_voice: bool) -> None:
             if voice and parts["ears"]:
                 # the voice starts with the first sentence; the rest keeps arriving in parallel
                 pieces = parts["brain"].answer_by_sentence(text, voice=True)
+                got_first = threading.Event()
+
+                def maybe_filler() -> None:  # only if the agent is slow: a quick answer needs no "one moment"
+                    if not got_first.wait(0.6):
+                        parts["ears"].filler()
+                threading.Thread(target=maybe_filler, daemon=True).start()
                 first = next(pieces, "")
+                got_first.set()
                 t1, rest = time.time(), []
                 worker = threading.Thread(target=lambda: rest.extend(pieces), daemon=True)
                 worker.start()
@@ -128,11 +135,15 @@ def app(with_voice: bool) -> None:
 
     def pick_voice(code: str) -> None:
         settings.save("voice", code)
+        from .voice import warm_fillers
+        threading.Thread(target=warm_fillers, daemon=True).start()
         english = settings.load()["speak_english"] or lang == "en"
         threading.Thread(target=say, args=(SAMPLE["en" if english else lang],), daemon=True).start()
 
     def pick_english(on: bool) -> None:
         settings.save("speak_english", on)
+        from .voice import warm_fillers
+        threading.Thread(target=warm_fillers, daemon=True).start()
         threading.Thread(target=say, args=(SAMPLE["en" if on else lang],), daemon=True).start()
 
     you = "You" if lang == "en" else "Vos"
@@ -157,6 +168,8 @@ def app(with_voice: bool) -> None:
             text, spoken = GREETING[lang]
             orb.show("JARVIS", text.format(key=s["hotkey"].title()))
             say(spoken if not s["speak_english"] else GREETING["en"][1])
+            from .voice import warm_fillers
+            threading.Thread(target=warm_fillers, daemon=True).start()  # "Right away, sir" ready in memory
 
             def speak_first(text: str) -> None:  # JARVIS talks without being asked: only when he's free
                 if not turn.acquire(timeout=20):  # busy answering: wait a bit, then drop it
