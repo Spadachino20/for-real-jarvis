@@ -26,6 +26,20 @@ GREETING = {"en": ('Online, sir. Say "Hey Jarvis" or press {key}.', "Online, sir
             "es": ('En línea, señor. Diga "oye Jarvis" o apriete {key}.', "En línea, señor.")}
 
 
+def quick_reply(text: str, lang: str) -> str | None:
+    """Questions JARVIS answers himself, instantly, without asking the agent."""
+    import datetime
+    t, now, es = text.lower(), datetime.datetime.now(), lang == "es"
+    days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    if re.search(r"\b(qu[eé] hora( es)?|what time( is it)?|the time)\b", t):
+        return f"Son las {now:%H:%M}, señor." if es else f"It's {now:%H:%M}, sir."
+    if re.search(r"\b(qu[eé] (d[ií]a|fecha) es( hoy)?|what('?s| is) (the date|today)|what day is it)\b", t):
+        return (f"Hoy es {days[now.weekday()]} {now.day} de {months[now.month - 1]}, señor." if es
+                else f"Today is {now:%A, %B} {now.day}, sir.")
+    return None
+
+
 def selftest() -> None:
     for module in ("settings", "brain", "voice", "panel"):
         r = subprocess.run([sys.executable, "-m", f"jarvis.{module}"], capture_output=True, text=True,
@@ -77,7 +91,7 @@ def app(with_voice: bool) -> None:
             from .panel import show_reply, background_reply, message_reply, metrics_reply, mode_reply, remember, where_reply
             if not (reply := where_reply(text, lang)):
                 remember(text)
-            if reply or (reply := mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or show_reply(text, lang, said) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := quick_reply(text, lang) or mode_reply(text, lang) or metrics_reply(text, lang) or message_reply(text, lang) or show_reply(text, lang, said) or background_reply(text, lang, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
@@ -96,14 +110,13 @@ def app(with_voice: bool) -> None:
                 first = next(pieces, "")
                 got_first.set()
                 t1, rest = time.time(), []
-                worker = threading.Thread(target=lambda: rest.extend(pieces), daemon=True)
-                worker.start()
 
-                def the_rest() -> str:
-                    worker.join()
-                    return " ".join(rest)
+                def the_rest():  # each sentence is spoken as soon as it arrives
+                    for sentence in pieces:
+                        rest.append(sentence)
+                        yield sentence
 
-                parts["ears"].speak(first, then=the_rest)
+                parts["ears"].speak(first, then=the_rest())
                 orb.show("JARVIS", " ".join([first, *rest]).strip())
             else:
                 reply = parts["brain"].answer(text, voice=voice)

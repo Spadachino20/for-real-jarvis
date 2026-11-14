@@ -508,7 +508,7 @@ class Ears:
         self.rec.set_microphone(not off)
 
     def speak(self, text: str, then=None) -> None:
-        """Says `text`; `then` (a function returning the rest of the answer, still arriving) follows it."""
+        """Says `text`; `then` (the rest of the answer: sentences still arriving, or a function returning it) follows it."""
         interruptible = settings.load()["interruptible"]
         self.state("speaking")
         _cut.clear()
@@ -517,10 +517,12 @@ class Ears:
             self.mute(True)  # so he doesn't hear himself through the speakers
         try:
             say(text)
-            if then:
-                rest = then()
-                if not _cut.is_set():
-                    say(rest)
+            if callable(then):
+                then = [then()]
+            for more in then or []:  # sentence by sentence, as the agent writes them
+                if _cut.is_set():
+                    break
+                say(more)
         finally:
             self.speaking, self._spoke_until = False, time.time()
             if not interruptible:
