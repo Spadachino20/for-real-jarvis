@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import re
 import threading
 
 from . import settings
@@ -116,6 +117,31 @@ def app(with_voice: bool) -> None:
             print(time.strftime("%H:%M:%S"), f"timings {'voice' if voice else 'chat'}: "
                   f"understand {heard:.1f}s | agent {t1 - t0:.1f}s | speak {time.time() - t1:.1f}s")
 
+    def clapped() -> None:
+        """Clap-clap (or snap-snap): straight into work mode, no agent in between."""
+        want = settings.load().get("clap_mode", "auto")
+        modes = settings.modes()
+        if want == "auto":
+            mode = next((m for m in modes if re.search(r"work|trabaj", f"{m.get('id', '')} {m.get('title', '')}", re.I)), None)
+        else:
+            mode = next((m for m in modes if m.get("id") == want), None)
+        es = lang == "es"
+        if not turn.acquire(blocking=False):  # busy answering: ignore the claps
+            return
+        try:
+            print(time.strftime("%H:%M:%S"), "clap-clap:", mode and mode.get("id"))
+            if mode is None:
+                reply = ("No tengo un modo trabajo todavía, señor. Pídame que lo creemos." if es
+                         else "I don't have a work mode yet, sir. Ask me to set one up.")
+            else:
+                from .panel import run_mode
+                title = mode.get("title") or mode["id"]
+                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")
+            orb.show("JARVIS", reply)
+            parts["ears"].speak(reply)
+        finally:
+            turn.release()
+
     def heard(text: str) -> None:
         orb.show(you, text)
         think(text, voice=True)
@@ -165,6 +191,8 @@ def app(with_voice: bool) -> None:
             from .voice import Ears, hotkey_listener
             parts["ears"] = Ears(heard, orb.set_state)
             threading.Thread(target=hotkey_listener, args=(parts["ears"].by_hotkey,), daemon=True).start()
+            from .voice import ClapDetector
+            parts["ears"].claps = ClapDetector(clapped)
             text, spoken = GREETING[lang]
             orb.show("JARVIS", text.format(key=s["hotkey"].title()))
             say(spoken if not s["speak_english"] else GREETING["en"][1])

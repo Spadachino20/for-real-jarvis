@@ -31,6 +31,8 @@ DEFAULTS = {
     "whisper_model": "small",                  # "base" = faster on CPU; with a GPU "large-v3-turbo" is fast and understands more
     "stt_device": "auto",                      # "auto" uses an NVIDIA GPU if there is one, "cpu" / "cuda" to force it
     "silence_sec": 0.45,                       # silence before JARVIS takes your sentence as finished (lower = faster, may cut you off)
+    "clap_mode": "auto",                       # mode run by two claps / snaps: "auto" = your work mode, "" = off, or a mode id
+    "clap_threshold": 0.35,                    # how loud a clap must be (0-1); raise it if JARVIS reacts to noises
     "fillers": True,                           # "Right away, sir" while the agent thinks, so it feels instant
     "vocabulary": "Jarvis, Spotify, YouTube, Chrome, WhatsApp, OpenClaw, Claude.",
     # How your agent knows a message came from the mic. Self-explaining, so no agent setup is needed.

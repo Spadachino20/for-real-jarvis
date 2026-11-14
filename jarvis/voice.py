@@ -155,6 +155,38 @@ def _play(audio, sr: int) -> None:
             time.sleep(0.04)
 
 
+class ClapDetector:
+    """Two claps (or finger snaps) in a row -> on_double(). Fed with the mic chunks the ears already read.
+    A clap is a short, loud peak far above the room's background noise; voice and music are steadier and fail that."""
+
+    def __init__(self, on_double: Callable[[], None]) -> None:
+        self.on_double = on_double
+        self.background = 0.01        # slow average of the room's loudness (RMS)
+        self.last_clap = 0.0          # when the previous clap was
+        self.blocked_until = 0.0      # quiet time after a double clap (or a clap that was too loud for too long)
+
+    def feed(self, audio: np.ndarray, now: float | None = None) -> bool:
+        s = settings.load()
+        if not s.get("clap_mode", "auto"):
+            return False
+        now = time.time() if now is None else now
+        peak = float(np.abs(audio).max()) if audio.size else 0.0
+        rms = float(np.sqrt(np.mean(audio ** 2))) if audio.size else 0.0
+        loud = peak > s.get("clap_threshold", 0.35) and peak > 8 * self.background and rms < 0.6 * peak
+        self.background = 0.97 * self.background + 0.03 * min(rms, 0.2)  # slow: one clap barely moves it
+        if not loud or now < self.blocked_until:
+            return False
+        gap = now - self.last_clap
+        if gap < 0.12:                 # the same clap still ringing
+            return False
+        self.last_clap = now
+        if 0.15 <= gap <= 0.8:         # second clap: clap-clap
+            self.last_clap, self.blocked_until = 0.0, now + 3
+            threading.Thread(target=self.on_double, daemon=True).start()
+            return True
+        return False
+
+
 def _device() -> str:
     """"cuda" with an NVIDIA card (e.g. RTX 5060) and CUDA installed, else "cpu". settings "stt_device" forces it."""
     want = settings.load().get("stt_device", "auto")
@@ -395,6 +427,7 @@ class Ears:
         self.running, self.mic_on, self.speaking = True, True, False
         self._awake_until = 0.0
         self._last_audio = time.time()
+        self.claps: ClapDetector | None = None   # set by the app: clap-clap -> work mode
         self.rec = self._create()
         threading.Thread(target=self._watchdog, daemon=True).start()
 
@@ -415,7 +448,10 @@ class Ears:
 
     def _audio(self, chunk) -> None:
         self._last_audio = time.time()
-        _mark("mic", np.frombuffer(chunk, np.int16) / 32768)
+        audio = np.frombuffer(chunk, np.int16) / 32768
+        _mark("mic", audio)
+        if self.claps and not self.speaking and self.mic_on:  # never on his own voice
+            self.claps.feed(audio)
 
     def _watchdog(self) -> None:
         while self.running:
