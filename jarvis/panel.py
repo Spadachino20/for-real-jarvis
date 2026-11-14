@@ -561,7 +561,12 @@ def models() -> dict:
     d = json.loads(OPENCLAW_JSON.read_text(encoding="utf-8-sig"))["agents"]["defaults"]
     model = d.get("model", {})
     allowed = d.get("modelPolicy", {}).get("allow") or sorted(k for k in d.get("models", {}) if "*" not in k)
-    return {"current": model.get("primary", ""), "fallbacks": model.get("fallbacks", []), "allowed": allowed, "can_set": True}
+    try:  # what the conversation really uses (it can be pinned to another model than the default)
+        main = next(s for s in gateway().call("sessions.list", {}).get("sessions", []) if s.get("key") == settings.load()["agent"]["session"])
+        current = f"{main.get('modelProvider')}/{main.get('model')}" if main.get("model") else model.get("primary", "")
+    except Exception:  # noqa: BLE001
+        current = model.get("primary", "")
+    return {"current": current, "fallbacks": model.get("fallbacks", []), "allowed": allowed, "can_set": True}
 
 
 def control_info() -> dict:
@@ -579,7 +584,13 @@ def control(action: str, value: str) -> str | None:
         r = subprocess.run(["openclaw.cmd", "config", "set", "agents.defaults.model.primary", value], capture_output=True,
                            text=True, encoding="utf-8", errors="replace", timeout=60, creationflags=subprocess.CREATE_NO_WINDOW)
         _cache.pop("models", None); _cache.pop("main", None)
-        return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[-240:] or "openclaw config set failed."
+        if r.returncode != 0:
+            return (r.stderr or r.stdout).strip()[-240:] or "openclaw config set failed."
+        try:  # a model picked in the chat (/model) pins the conversation: move it too, or nothing changes
+            gateway().call("sessions.patch", {"key": settings.load()["agent"]["session"], "model": value})
+        except Exception as e:  # noqa: BLE001
+            return f"Default changed, but not this conversation: {e}"[:240]
+        return None
     if action == "music" and value in ("play", "pause", "next", "previous"):
         _in_thread(lambda: (_ps("music", value), _cache.pop("music", None)))
     elif action == "volume" and value in ("up", "down", "mute"):
