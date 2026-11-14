@@ -164,6 +164,21 @@ class Brain:
     def __init__(self) -> None:
         import threading
         threading.Thread(target=self._watch, daemon=True).start()
+        threading.Thread(target=self._warm_up, daemon=True).start()
+
+    def _warm_up(self) -> None:
+        """Right after Windows starts, the agent's first answer is slow (it's still loading). Wake it up now, in a
+        side session, so your first question doesn't pay for it. One tiny message."""
+        for _ in range(60):  # up to 10 minutes for the agent to come up
+            if alive():
+                try:
+                    ask("[WARMUP - reply only: OK]", timeout=240,
+                        session="agent:main:warmup" if _agent()["kind"] == "openclaw" else "for-real-jarvis-warmup")
+                    print(time.strftime("%H:%M:%S"), "agent warmed up")
+                except Exception as e:  # noqa: BLE001
+                    print("warm-up failed:", type(e).__name__)
+                return
+            time.sleep(10)
 
     def _watch(self) -> None:
         while True:

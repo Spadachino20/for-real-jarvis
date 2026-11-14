@@ -402,18 +402,22 @@ class Ears:
         self.speaking, self._spoke_from = True, time.time()
         if not interruptible:
             self.mute(True)  # so he doesn't hear himself through the speakers
+        last = text
         try:
             say(text)
             if then:
                 rest = then()
+                last = rest or text
                 if not _cut.is_set():
                     say(rest)
         finally:
             self.speaking, self._spoke_until = False, time.time()
             if not interruptible:
                 self.mute(False)
-            self._awake_until = time.time() + FOLLOW_UP_SEC  # you can follow up without the name
-            self.state("listening")
+            # he asked something ("¿Sigo?"): answer without the name. Otherwise back to waiting for "Jarvis"
+            asked = last.strip().rstrip(" .!").endswith("?") or settings.load().get("follow_up", False)
+            self._awake_until = time.time() + FOLLOW_UP_SEC if asked else 0.0
+            self.state("listening" if asked else "idle")
 
     def loop(self) -> None:
         self.state("idle")
