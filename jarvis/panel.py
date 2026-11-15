@@ -466,7 +466,7 @@ def show_reply(text: str, lang: str, done: Callable[[str], None]) -> str | None:
 
 
 _pending: dict = {}  # a mode waiting for your "yes" (modes with "confirm")
-_YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo)\b", re.I)
+_YES = re.compile(r"^\W*(s[ií]|dale|ok|okay|yes|yeah|sure|hazlo|hacelo|segu[ií]|sigue|adelante|go|do it|confirmo|proced[eé]?|proceed|c)\b", re.I)
 
 
 def mode_reply(text: str, lang: str = "en") -> str | None:

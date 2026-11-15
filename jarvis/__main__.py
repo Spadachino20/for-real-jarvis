@@ -139,7 +139,7 @@ def app(with_voice: bool) -> None:
             mode = next((m for m in modes if re.search(r"work|trabaj", f"{m.get('id', '')} {m.get('title', '')}", re.I)), None)
         else:
             mode = next((m for m in modes if m.get("id") == want), None)
-        es = lang == "es"
+        es = lang == "es" and not settings.load()["speak_english"]  # same language as his voice
         if not turn.acquire(blocking=False):  # busy answering: ignore the claps
             return
         try:
@@ -148,14 +148,9 @@ def app(with_voice: bool) -> None:
                 reply = ("No tengo un modo trabajo todavía, señor. Pídame que lo creemos." if es
                          else "I don't have a work mode yet, sir. Ask me to set one up.")
             else:
-                from .panel import _pending, run_mode
+                from .panel import run_mode
                 title = mode.get("title") or mode["id"]
-                if mode.get("confirm"):  # never close apps on a noise: ask first, like by voice
-                    _pending.update(run=lambda: run_mode(mode["id"]) or (f"Modo {title}, señor." if es else f"{title} mode, sir."),
-                                    at=time.time())
-                    reply = mode["confirm"]
-                else:
-                    reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")
+                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")  # claps are deliberate: no "shall I?"
             orb.show("JARVIS", reply)
             parts["ears"].speak(reply)
         finally:
