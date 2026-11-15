@@ -122,12 +122,17 @@ def ask_stream(content, timeout: int = 300):
 
 def sentences(chunks):
     """Join streamed chunks and hand out whole sentences (plus whatever is left at the end)."""
-    buffer = ""
+    buffer, first = "", True
     for chunk in chunks:
         buffer += chunk
+        if first and (cut := buffer.find(", ", 15)) != -1 and not _SENTENCE_END.search(buffer[:cut]):
+            first = False  # a long first sentence: start speaking at its first comma (~2 s sooner)
+            yield buffer[:cut + 1].strip()
+            buffer = buffer[cut + 2:]
         parts = _SENTENCE_END.split(buffer)
         for done in parts[:-1]:
             if done.strip():
+                first = False
                 yield done.strip()
         buffer = parts[-1]
     if buffer.strip():
@@ -221,5 +226,6 @@ class Brain:
 if __name__ == "__main__":
     assert with_screen("what time is it?") == "what time is it?"
     assert list(sentences(["Hello, s", "ir. It is", " 8. All good"])) == ["Hello, sir.", "It is 8.", "All good"]
+    assert list(sentences(["The Toyota Corolla, sir", ", with 50 million sold. Yes"])) == ["The Toyota Corolla,", "sir, with 50 million sold.", "Yes"]
     assert _WANTS_SCREEN.search("look at my screen") and _WANTS_SCREEN.search("mirá mi pantalla")
     print("brain ok; agent alive:", alive())
