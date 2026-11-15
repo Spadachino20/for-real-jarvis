@@ -630,12 +630,12 @@ def start(orb: Callable[[], dict]) -> str | None:
     page = HERE / "panel.html"  # read on every visit: editing it doesn't need an orb restart
 
     class Handler(BaseHTTPRequestHandler):
-        def _send(self, code: int, body: bytes, ctype: str = "application/json; charset=utf-8") -> None:
+        def _send(self, code: int, body: bytes, ctype: str = "application/json; charset=utf-8", frame: str = "DENY") -> None:
             try:
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("X-Frame-Options", frame)
                 self.end_headers()
                 self.wfile.write(body)
             except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
@@ -651,6 +651,7 @@ def start(orb: Callable[[], dict]) -> str | None:
             if path in ("/", "/index.html"):
                 ident = settings.identity()
                 html = page.read_text(encoding="utf-8").replace("__KEY__", KEY).replace("__LANG__", settings.load()["language"])
+                html = html.replace("__GRAPH__", "" if settings.load()["graph"] else "hidden")
                 for k in ("name", "short", "letter", "color"):
                     html = html.replace(f"__{k.upper()}__", ident[k])
                 return self._send(200, html.encode(), "text/html; charset=utf-8")
@@ -666,6 +667,11 @@ def start(orb: Callable[[], dict]) -> str | None:
                 manifest = json.loads((HERE / "static" / "manifest.webmanifest").read_text(encoding="utf-8"))
                 manifest.update(name=ident["name"], short_name=ident["short"])
                 return self._send(200, json.dumps(manifest).encode(), "application/manifest+json")
+            if path == "/graph":  # your own graph page (settings "graph"), shown in the Graph tab
+                file = Path(settings.load()["graph"] or "-")
+                if file.suffix.lower() != ".html" or not file.is_file():
+                    return self._json({"error": "not found"}, 404)
+                return self._send(200, file.read_bytes(), "text/html; charset=utf-8", frame="SAMEORIGIN")
             if path == "/api/orblog":
                 return self._json(orb_log()[::-1])
             if path == "/api/status":

@@ -27,6 +27,7 @@ DEFAULTS = {
     "hotkey": "ctrl+shift+j",                  # press = saying "Jarvis"
     "whatsapp_contacts": [],                   # names JARVIS may message by voice ("tell Ana I'm late"), always asking first
     "interruptible": True,                     # keep the mic on while JARVIS talks so you can cut him off (headphones)
+    "graph": "",                               # path to an .html graph of your notes (e.g. graphify-out/graph.html): adds a Graph tab to the panel
     "orb_gain": 8.0,                           # how much the orb rings open with the volume
     "whisper_model": "small",                  # "base" = faster on CPU; with a GPU "large-v3-turbo" is fast and understands more
     "stt_device": "auto",                      # "auto" uses an NVIDIA GPU if there is one, "cpu" / "cuda" to force it
