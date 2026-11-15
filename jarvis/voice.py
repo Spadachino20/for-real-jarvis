@@ -539,15 +539,15 @@ class Ears:
             self._awake_until = time.time() + FOLLOW_UP_SEC if asked else 0.0
             self.state("listening" if asked else "idle")
 
-    def filler(self) -> None:
-        """Short "Right away, sir" while the agent thinks, without hearing himself."""
+    def filler(self, text: str | None = None) -> None:
+        """Short "Right away, sir" while the agent thinks (or the line given), without hearing himself."""
         interruptible = settings.load()["interruptible"]
         _cut.clear()
         self.speaking, self._spoke_from = True, time.time()
         if not interruptible:
             self.mute(True)
         try:
-            filler()
+            say(text) if text else filler()
         finally:
             self.speaking, self._spoke_until = False, time.time()
             if not interruptible:

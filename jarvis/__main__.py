@@ -107,6 +107,10 @@ def app(with_voice: bool) -> None:
                 def maybe_filler() -> None:  # only if the agent is slow: a quick answer needs no "one moment"
                     if not got_first.wait(0.6):
                         parts["ears"].filler()
+                    if not got_first.wait(7):  # using tools: say so instead of 30 s of silence; the answer still comes spoken
+                        parts["ears"].filler("En eso estoy, señor. Le aviso cuando termine." if spoken == "es"
+                                             else "Working on it, sir. I'll let you know when it's done.")
+                        orb.set_state("thinking")
                 threading.Thread(target=maybe_filler, daemon=True).start()
                 first = next(pieces, "")
                 got_first.set()
