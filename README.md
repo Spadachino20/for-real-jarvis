@@ -197,6 +197,24 @@ you visit can press them.
 | `whatsapp_contacts` | `[]` | names JARVIS may message by voice (your agent knows their numbers); always asks first |
 | `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
 | `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
+| `gestures` | `false` | webcam hand gestures, trained on your own hands (see below) |
+| `fast_wake` / `wake_threshold` | `true` / `0.5` | beep ~0.2 s after "Hey Jarvis" (openWakeWord) instead of after the transcription |
+
+### Hand gestures (webcam)
+
+`python -m jarvis.hands` opens a test window. Hold a gesture and press its number to record it from your own
+camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **3** V, **4** thumbs up,
+and **0** while you type normally, so typing never fires anything. Then set `"gestures": true`.
+
+| Gesture | What it does |
+|---|---|
+| ✊ fist (0.4 s) | stops everything: the voice, his thinking and tools, and tells your agent what you actually heard |
+| ✋ open palm (1 s) | play/pause music |
+| ✌️ V (1 s) | listen, like saying "Jarvis" |
+| 👍 thumbs up (1 s) | "yes" to his question |
+
+Needs `pip install mediapipe opencv-python` and the MediaPipe hand model in `models/`
+([hand_landmarker.task](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task)).
 
 Everything personal (settings, modes, keys, logs) lives in `data/`, which never leaves your PC.
 

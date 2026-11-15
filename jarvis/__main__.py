@@ -160,6 +160,43 @@ def app(with_voice: bool) -> None:
         finally:
             turn.release()
 
+    def stop_all() -> None:
+        """Fist: silence now, stop the agent's run (thinking, tools, writing), and leave it a note with what you heard."""
+        from .voice import cut
+        from . import brain
+        cut()
+        if not turn.locked():
+            return
+        brain.STOPPED.set()
+        orb.set_state("idle")
+        said = " ".join(getattr(parts["ears"], "said", []) if parts["ears"] and parts["ears"].speaking else [])
+        if settings.load()["agent"]["kind"] != "openclaw":
+            return
+        from .panel import gateway
+        key = settings.load()["agent"]["session"]
+        try:
+            gateway().call("chat.abort", {"sessionKey": key})
+            gateway().call("chat.inject", {"sessionKey": key, "label": "cut off", "message":
+                "[He cut me off with a gesture. He only heard: «" + (said[-600:] or "nothing") +
+                "». Anything after that he did NOT hear and was NOT done; don't assume it.]"})
+            print(time.strftime("%H:%M:%S"), "stopped by fist after:", len(said.split()), "words")
+        except Exception as e:  # noqa: BLE001
+            print("couldn't stop the agent:", e)
+
+    def gesture(name: str) -> None:
+        import ctypes
+        if name == "puño":
+            stop_all()
+        elif name == "palma":  # music play/pause (any player)
+            ctypes.windll.user32.keybd_event(0xB3, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(0xB3, 0, 2, 0)
+        elif name == "dos dedos" and parts["ears"]:  # like saying "Jarvis"
+            parts["ears"]._wake(True)
+        elif name == "pulgar arriba":  # "yes" to his question
+            from .panel import _pending
+            if _pending:
+                threading.Thread(target=think, args=("sí", True), daemon=True).start()
+
     def heard(text: str) -> None:
         orb.show(you, text)
         think(text, voice=True)
@@ -226,6 +263,9 @@ def app(with_voice: bool) -> None:
                         parts["ears"].speak(text)
                     finally:
                         turn.release()
+            if settings.load().get("gestures"):  # webcam hands: python -m jarvis.hands trains them
+                from .hands import watch as watch_hands
+                threading.Thread(target=watch_hands, args=(gesture,), daemon=True).start()
             from .proactive import watch
             threading.Thread(target=watch, args=(speak_first,), daemon=True).start()
             parts["ears"].loop()

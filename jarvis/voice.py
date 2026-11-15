@@ -456,6 +456,30 @@ class Ears:
             self.claps.last_clap = 0.0
         elif self.claps and not self.speaking and self.mic_on:  # never on his own voice
             self.claps.feed(audio)
+        if self.mic_on and not self.speaking and not self.awake():
+            self._spot(np.frombuffer(chunk, np.int16))
+
+    def _spot(self, pcm: np.ndarray) -> None:
+        """openWakeWord hears "(hey) Jarvis" while you're still talking: beep in ~0.2 s instead of after Whisper."""
+        if not settings.load().get("fast_wake", True):
+            return
+        if not hasattr(self, "_oww"):
+            try:
+                from openwakeword.model import Model
+                self._oww, self._oww_buf = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx"), np.zeros(0, np.int16)
+            except Exception as e:  # noqa: BLE001 — no model: Whisper still wakes him, just later
+                print("fast wake off:", type(e).__name__, str(e)[:120])
+                self._oww = None
+        if self._oww is None:
+            return
+        self._oww_buf = np.concatenate([self._oww_buf, pcm])
+        while self._oww_buf.size >= 1280:  # the model eats 80 ms frames
+            frame, self._oww_buf = self._oww_buf[:1280], self._oww_buf[1280:]
+            score = max(self._oww.predict(frame).values())
+            if score > settings.load().get("wake_threshold", 0.5) and time.time() - getattr(self, "_fast_woke", 0) > 3:
+                self._fast_woke = time.time()
+                self._oww.reset()
+                threading.Thread(target=self._wake, args=(True,), daemon=True).start()
 
     def _watchdog(self) -> None:
         while self.running:
@@ -482,10 +506,11 @@ class Ears:
         if self.awake():
             self.state("thinking")
 
-    def _wake(self) -> None:
+    def _wake(self, fast: bool = False) -> None:
         self._awake_until = time.time() + FOLLOW_UP_SEC
         self.state("listening")
-        beep()
+        if fast or time.time() - getattr(self, "_fast_woke", 0) > 4:  # the fast spotter already beeped
+            beep()
 
     def _sleep(self) -> None:
         self._awake_until = 0.0
@@ -519,7 +544,7 @@ class Ears:
         self.speaking, self._spoke_from = True, time.time()
         if not interruptible:
             self.mute(True)  # so he doesn't hear himself through the speakers
-        last = text
+        last, self.said = text, [text]  # what he actually got to say (the fist cuts here)
         try:
             say(text)
             if callable(then):
@@ -528,6 +553,7 @@ class Ears:
                 if _cut.is_set():
                     break
                 if more:
+                    self.said.append(more)
                     last = more  # the last thing said decides if he waits for an answer ("¿Sigo?")
                 say(more)
         finally:
@@ -543,7 +569,7 @@ class Ears:
         """Short "Right away, sir" while the agent thinks (or the line given), without hearing himself."""
         interruptible = settings.load()["interruptible"]
         _cut.clear()
-        self.speaking, self._spoke_from = True, time.time()
+        self.speaking, self._spoke_from, self.said = True, time.time(), []  # a filler isn't part of the answer
         if not interruptible:
             self.mute(True)
         try:

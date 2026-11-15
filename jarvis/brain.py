@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -46,6 +47,7 @@ def _headers(session: str | None = None) -> dict:
     return h
 
 
+STOPPED = threading.Event()  # you cut him off (fist): no retry, no "agent down"
 CHAT_TAG = "[CHAT - typed, not spoken: markdown is fine] "  # so the agent tells typing from voice
 _history: list[dict] = []  # what the panel's chat shows for non-OpenClaw agents (and the context for plain "openai" ones)
 
@@ -212,14 +214,17 @@ class Brain:
         if not alive():
             yield self._down()
             return
+        STOPPED.clear()
         content, any_ = with_screen((voice_tag() if voice else CHAT_TAG) + text), False
         try:
             for sentence in sentences(ask_stream(content)):
+                if STOPPED.is_set():
+                    return
                 any_ = True
                 yield sentence
         except Exception as e:  # noqa: BLE001
             print("streaming failed:", type(e).__name__, str(e)[:200])
-        if not any_:
+        if not any_ and not STOPPED.is_set():
             yield self.answer(text, voice=voice)
 
 
