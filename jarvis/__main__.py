@@ -148,9 +148,14 @@ def app(with_voice: bool) -> None:
                 reply = ("No tengo un modo trabajo todavía, señor. Pídame que lo creemos." if es
                          else "I don't have a work mode yet, sir. Ask me to set one up.")
             else:
-                from .panel import run_mode
+                from .panel import _pending, run_mode
                 title = mode.get("title") or mode["id"]
-                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")
+                if mode.get("confirm"):  # never close apps on a noise: ask first, like by voice
+                    _pending.update(run=lambda: run_mode(mode["id"]) or (f"Modo {title}, señor." if es else f"{title} mode, sir."),
+                                    at=time.time())
+                    reply = mode["confirm"]
+                else:
+                    reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")
             orb.show("JARVIS", reply)
             parts["ears"].speak(reply)
         finally:
