@@ -294,7 +294,8 @@ class Orb:
     def _open_panel(self) -> None:
         import webbrowser
         if self.panel_url:
-            webbrowser.open(self.panel_url)
+            if not open_lean(self.panel_url):
+                webbrowser.open(self.panel_url)
         else:
             self.show("JARVIS", self.t["no_panel"])
 
@@ -303,3 +304,21 @@ class Orb:
 
     def close(self) -> None:
         self.root.after(0, self.root.destroy)
+
+
+def open_lean(url: str) -> bool:
+    """The panel in its own small window: a separate, stripped-down Chrome/Edge (no tabs, extensions or GPU),
+    so it costs ~120 MB instead of a whole browser. False = no Chromium found: use the normal browser."""
+    import os
+    import subprocess
+    from . import settings
+    for exe in (r"%ProgramFiles%\Google\Chrome\Application\chrome.exe", r"%LocalAppData%\Google\Chrome\Application\chrome.exe",
+                r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"):
+        exe = os.path.expandvars(exe)
+        if os.path.exists(exe):
+            subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={settings.DATA / 'panel-browser'}",
+                              "--window-size=1100,800", "--no-first-run", "--disable-extensions", "--disable-gpu",
+                              "--renderer-process-limit=1", "--disable-background-networking", "--disable-sync",
+                              "--disable-features=Translate,OptimizationHints,MediaRouter,AutofillServerCommunication"])
+            return True
+    return False

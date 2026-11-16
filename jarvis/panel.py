@@ -166,7 +166,12 @@ def _session_name(key: str, label: str | None = None) -> str:
     return re.sub(r"^agent:[^:]+:(explicit:)?", "", key)
 
 
+LIGHT_TOKENS = {"total": 0, "input": 0, "output": 0, "cache": 0, "cost": 0, "today": 0, "daily": [], "sessions": [], "models": []}
+
+
 def tokens() -> dict:
+    if kind() == "claude-cli":  # light house: no gateway to count them (claude counts them in your Claude plan)
+        return LIGHT_TOKENS
     g = gateway()
     cost = g.call("usage.cost", {"days": 30}, timeout=40)
     sessions = g.call("sessions.usage", {"limit": 60}, timeout=40).get("sessions", [])
@@ -191,6 +196,8 @@ def tokens() -> dict:
 
 
 def automations() -> list[dict]:
+    if kind() == "claude-cli":  # they live in OpenClaw: back in the big house they run again
+        return []
     out = []
     for j in gateway().call("cron.list", {"includeDisabled": True}).get("jobs", []):  # without it, paused ones vanish
         st, h = j.get("state") or {}, j.get("schedule") or {}
@@ -205,6 +212,9 @@ def automations() -> list[dict]:
 
 
 def sessions() -> list[dict]:
+    if kind() == "claude-cli":
+        return [{"name": "JARVIS (light house)", "model": settings.load()["agent"].get("model", ""), "tokens": 0,
+                 "active": brain._cli.lock.locked(), "last": ""}]
     return [{"name": _session_name(s.get("key", ""), s.get("displayName") or s.get("label")), "model": s.get("model") or "",
              "tokens": s.get("totalTokens") or 0, "active": bool(s.get("hasActiveRun")),
              "last": _when(s.get("lastActivityAt") or s.get("updatedAt"))}
@@ -212,6 +222,13 @@ def sessions() -> list[dict]:
 
 
 def chat() -> list[dict]:
+    if kind() == "claude-cli":  # light house: what was said since he moved in (voice and chat)
+        out = []
+        for turn in brain._cli.log[-20:]:
+            you, _, him = turn.partition("\nJARVIS: ")
+            out += [{"role": "user", "text": you.removeprefix("ST: ").replace(brain.CHAT_TAG, ""), "tools": [], "time": ""},
+                    {"role": "assistant", "text": him, "tools": [], "time": ""}]
+        return out
     if kind() != "openclaw":  # other agents: the conversation the orb itself keeps
         return [{"role": m["role"], "text": m["content"], "tools": [], "time": ""} for m in brain._history[-40:]]
     out = []
@@ -505,6 +522,8 @@ def run_mode(mode_id: str, leaving: bool = False) -> str | None:
             else:
                 _mode["game_until"] = time.time() + 4 * 3600 if mode.get("game") else 0  # proactive watches harder
                 result = _ps("mode", mode_id, timeout=120)
+                from .house import follow_mode
+                follow_mode(mode)  # game: JARVIS moves to his light house; anything else: back home
                 if mode.get("tell_agent"):
                     result += "\nJARVIS: " + brain.ask("[PANEL] " + mode["tell_agent"], timeout=120)
                 _mode["active"] = mode_id if mode.get("exit_message") else _mode["active"]

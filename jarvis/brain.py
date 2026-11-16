@@ -87,10 +87,87 @@ def with_screen(text: str) -> str | list:
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + data}}]
 
 
+class ClaudeCLI:
+    """agent kind "claude-cli": ONE `claude` kept open (stream-json), so there's no gateway in between.
+    ~300 MB, first word in ~1.3 s; it starts once (~10 s). Works in agent.workspace (your SOUL/USER/AGENTS, skills)."""
+
+    def __init__(self) -> None:
+        self.proc, self.lock, self.started = None, threading.Lock(), False
+        self.handoff: str | None = None  # what you were just talking about in the other house (house.py)
+        self.log: list[str] = []  # what was said here, handed back when he moves home
+
+    def _start(self):
+        import shutil
+        a = _agent()
+        cmd = [shutil.which("claude") or "claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json",
+               "--verbose", "--include-partial-messages", "--model", a.get("model") or "claude-haiku-5-5",
+               "--dangerously-skip-permissions"] + ["--continue"]  # the same conversation across restarts, like OpenClaw kept it
+        self.started = True
+        self.proc = subprocess.Popen(cmd, cwd=a.get("workspace") or None, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, text=True, encoding="utf-8", bufsize=1,
+                                     creationflags=subprocess.CREATE_NO_WINDOW)
+
+    def stop(self) -> None:
+        """Kills the current answer (and whatever tool it was running); the next question starts a fresh one."""
+        if self.proc and self.proc.poll() is None:
+            self.proc.kill()
+        self.proc = None
+
+    def stream(self, content):
+        if isinstance(content, list):  # text + screenshot (OpenAI shape) -> Anthropic blocks
+            content = [{"type": "text", "text": b["text"]} if b["type"] == "text" else
+                       {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                    "data": b["image_url"]["url"].split(",", 1)[1]}} for b in content]
+        said = content if isinstance(content, str) else content[0]["text"]
+        if self.handoff:
+            note, self.handoff = self.handoff, None
+            content = note + "\n\n" + content if isinstance(content, str) else [{"type": "text", "text": note}] + content
+        answer = []
+        with self.lock:
+            if self.proc is None or self.proc.poll() is not None:
+                self._start()
+            proc = self.proc
+            proc.stdin.write(json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n")
+            proc.stdin.flush()
+            for line in proc.stdout:
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                if e.get("type") == "stream_event":
+                    d = e["event"].get("delta") or {}
+                    if d.get("type") == "text_delta" and d.get("text"):
+                        answer.append(d["text"])
+                        yield d["text"]
+                elif e.get("type") == "result":
+                    break
+            self.log.append(f"ST: {said}\nJARVIS: {''.join(answer).strip()}")
+
+
+_cli = ClaudeCLI()
+
+
+def _warm_cli() -> None:
+    """Open the light house's `claude` now (~10 s), so the first question is fast."""
+    with _cli.lock:
+        if _cli.proc is None or _cli.proc.poll() is not None:
+            _cli._start()
+
+
 def ask(content, timeout: int = 300, session: str | None = None) -> str:
     """session: another conversation of your agent (background tasks), so the main one stays free."""
     import httpx
     a = _agent()
+    if a["kind"] == "claude-cli":
+        if session:  # a side task: its own one-shot claude, the main one stays free
+            text = content if isinstance(content, str) else content[0]["text"]
+            import shutil
+            r = subprocess.run([shutil.which("claude") or "claude", "-p", text, "--model", a.get("model") or "claude-haiku-5-5",
+                                "--dangerously-skip-permissions"], cwd=a.get("workspace") or None, capture_output=True,
+                               text=True, encoding="utf-8", timeout=timeout,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+            return r.stdout.strip()
+        return "".join(_cli.stream(content)).strip()
     r = httpx.post(a["url"].rstrip("/") + "/v1/chat/completions", timeout=timeout, headers=_headers(session),
                    json={"model": a["model"], "messages": _messages(content)})
     r.raise_for_status()
@@ -103,6 +180,9 @@ def ask_stream(content, timeout: int = 300):
     """Text as your agent writes it (stream=true)."""
     import httpx
     a, parts = _agent(), []
+    if a["kind"] == "claude-cli":
+        yield from _cli.stream(content)
+        return
     with httpx.stream("POST", a["url"].rstrip("/") + "/v1/chat/completions", timeout=timeout, headers=_headers(),
                       json={"model": a["model"], "stream": True, "messages": _messages(content)}) as r:
         r.raise_for_status()
@@ -142,6 +222,8 @@ def sentences(chunks):
 
 
 def alive() -> bool:
+    if _agent()["kind"] == "claude-cli":
+        return True
     import socket
     from urllib.parse import urlparse
     u = urlparse(_agent()["url"])
@@ -176,6 +258,9 @@ class Brain:
     def _warm_up(self) -> None:
         """Right after Windows starts, the agent's first answer is slow (it's still loading). Wake it up now, in a
         side session, so your first question doesn't pay for it. One tiny message."""
+        if _agent()["kind"] == "claude-cli":
+            _warm_cli()
+            return
         for _ in range(60):  # up to 10 minutes for the agent to come up
             if alive():
                 try:

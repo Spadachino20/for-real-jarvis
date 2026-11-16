@@ -454,6 +454,9 @@ class Ears:
         talking = getattr(self, "_rec_start", 0) > getattr(self, "_rec_end", 0) or time.time() - getattr(self, "_rec_end", 0) < 1
         if self.claps and talking:  # "p", "t", "k" in your voice peak like claps: none while you speak
             self.claps.last_clap = 0.0
+            if np.abs(audio).max() > 0.35 and time.time() - getattr(self, "_clap_note", 0) > 5:
+                self._clap_note = time.time()
+                print(time.strftime("%H:%M:%S"), "clap ignored: the mic thinks someone is talking (music? voice?)")
         elif self.claps and not self.speaking and self.mic_on:  # never on his own voice
             self.claps.feed(audio)
         if self.mic_on and not self.speaking and not self.awake():

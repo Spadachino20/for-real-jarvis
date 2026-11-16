@@ -55,11 +55,24 @@ def already_running() -> bool:
     return ctypes.windll.kernel32.GetLastError() == 183  # ERROR_ALREADY_EXISTS
 
 
+def kill_orphans() -> None:
+    """A JARVIS that was killed leaves its Whisper workers behind (~500 MB): close those whose parent is gone."""
+    import os
+    r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                        "$all = (Get-Process).Id; Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
+                        "? { $_.CommandLine -like '*spawn_main*' -and $all -notcontains $_.ParentProcessId } | % ProcessId"],
+                       capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    for pid in r.stdout.split():
+        os.kill(int(pid), 9)
+        print("closed an orphan worker:", pid)
+
+
 def app(with_voice: bool) -> None:
     if already_running():
         print("JARVIS is already running.")
         return
     import time
+    threading.Thread(target=kill_orphans, daemon=True).start()
     from .brain import Brain
     from .voice import SAMPLE, VOICES, level, say
     from .widget import Orb
@@ -154,7 +167,7 @@ def app(with_voice: bool) -> None:
             else:
                 from .panel import run_mode
                 title = mode.get("title") or mode["id"]
-                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"{title} mode engaged, sir.")  # claps are deliberate: no "shall I?"
+                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"Activating {mode.get('title_en', 'work' if want == 'auto' else title)} mode, sir.")  # claps are deliberate: no "shall I?"
             orb.show("JARVIS", reply)
             parts["ears"].speak(reply)
         finally:
@@ -170,6 +183,10 @@ def app(with_voice: bool) -> None:
         brain.STOPPED.set()
         orb.set_state("idle")
         said = " ".join(getattr(parts["ears"], "said", []) if parts["ears"] and parts["ears"].speaking else [])
+        if settings.load()["agent"]["kind"] == "claude-cli":
+            brain._cli.stop()  # kills its thinking and tools; the next question opens a fresh one
+            print(time.strftime("%H:%M:%S"), "stopped by fist (claude-cli)")
+            return
         if settings.load()["agent"]["kind"] != "openclaw":
             return
         from .panel import gateway
@@ -190,8 +207,19 @@ def app(with_voice: bool) -> None:
         elif name == "palma":  # music play/pause (any player)
             ctypes.windll.user32.keybd_event(0xB3, 0, 0, 0)
             ctypes.windll.user32.keybd_event(0xB3, 0, 2, 0)
-        elif name == "dos dedos" and parts["ears"]:  # like saying "Jarvis"
-            parts["ears"]._wake(True)
+        elif name.startswith("barrer"):  # next / previous song
+            key = 0xB0 if name == "barrer derecha" else 0xB1
+            ctypes.windll.user32.keybd_event(key, 0, 0, 0)
+            ctypes.windll.user32.keybd_event(key, 0, 2, 0)
+        elif name == "dos dedos":  # screenshot: Win+Shift+S, pick the area, it's on the clipboard
+            for k in (0x5B, 0x10, 0x53):
+                ctypes.windll.user32.keybd_event(k, 0, 0, 0)
+            for k in (0x53, 0x10, 0x5B):
+                ctypes.windll.user32.keybd_event(k, 0, 2, 0)
+        elif name == "cuernos":  # settings "horns_mode" (default: juego)
+            from .panel import run_mode
+            if mode := next((m for m in settings.modes() if m.get("id") == settings.load().get("horns_mode", "juego")), None):
+                said(run_mode(mode["id"]) or f"Activating {mode.get('title_en', mode.get('title') or mode['id'])} mode, sir.")
         elif name == "pulgar arriba":  # "yes" to his question
             from .panel import _pending
             if _pending:

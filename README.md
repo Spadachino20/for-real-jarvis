@@ -197,21 +197,26 @@ you visit can press them.
 | `whatsapp_contacts` | `[]` | names JARVIS may message by voice (your agent knows their numbers); always asks first |
 | `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
 | `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
+| `agent.kind: "claude-cli"` | — | no gateway: the orb keeps ONE `claude` open (~300 MB, first word ~1.3 s); set `agent.workspace` to your agent's folder (it needs a `CLAUDE.md` that loads its SOUL/USER/MEMORY) |
+| `agent_openclaw` | — | your OpenClaw agent config: then game modes move JARVIS to the light `claude` house and close OpenClaw (~1.7 GB freed), other modes bring him back, conversation included |
+| `clap_mode` / `horns_mode` | `""` / `juego` | the mode two claps / the 🤘 gesture start |
 | `gestures` | `false` | webcam hand gestures, trained on your own hands (see below) |
 | `fast_wake` / `wake_threshold` | `true` / `0.5` | beep ~0.2 s after "Hey Jarvis" (openWakeWord) instead of after the transcription |
 
 ### Hand gestures (webcam)
 
 `python -m jarvis.hands` opens a test window. Hold a gesture and press its number to record it from your own
-camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **3** V, **4** thumbs up,
+camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **3** V, **4** thumbs up, **5**/**6** swipe right/left, **7** horns,
 and **0** while you type normally, so typing never fires anything. Then set `"gestures": true`.
 
 | Gesture | What it does |
 |---|---|
 | ✊ fist (0.4 s) | stops everything: the voice, his thinking and tools, and tells your agent what you actually heard |
 | ✋ open palm (1 s) | play/pause music |
-| ✌️ V (1 s) | listen, like saying "Jarvis" |
+| ✌️ V (1 s) | screenshot (Win+Shift+S) |
 | 👍 thumbs up (1 s) | "yes" to his question |
+| 🤘 horns (1 s) | starts `horns_mode` |
+| swipe right / left (trained with 5 / 6) | next / previous song |
 
 Needs `pip install mediapipe opencv-python` and the MediaPipe hand model in `models/`
 ([hand_landmarker.task](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task)).
