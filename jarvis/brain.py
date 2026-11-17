@@ -100,11 +100,21 @@ class ClaudeCLI:
         import shutil
         a = _agent()
         cmd = [shutil.which("claude") or "claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json",
-               "--verbose", "--include-partial-messages", "--model", a.get("model") or "claude-haiku-5-5",
-               "--dangerously-skip-permissions"] + ["--continue"]  # the same conversation across restarts, like OpenClaw kept it
+               "--verbose", "--include-partial-messages", "--model", a["model"] if str(a.get("model", "")).startswith("claude") else "claude-haiku-5-5",
+               "--dangerously-skip-permissions"]
+        # its OWN conversation, kept across restarts (--continue could pick up OpenClaw's, which runs claude in the same folder)
+        import uuid
+        sid_file = settings.DATA / "light-session.txt"
+        if sid_file.exists():
+            cmd += ["--resume", sid_file.read_text().strip()]
+        else:
+            sid = str(uuid.uuid4())
+            sid_file.write_text(sid)
+            cmd += ["--session-id", sid]
         self.started = True
         self.proc = subprocess.Popen(cmd, cwd=a.get("workspace") or None, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=subprocess.DEVNULL, text=True, encoding="utf-8", bufsize=1,
+                                     stderr=open(settings.DATA / "claude-cli.log", "a", encoding="utf-8"), text=True,
+                                     encoding="utf-8", bufsize=1,
                                      creationflags=subprocess.CREATE_NO_WINDOW)
 
     def stop(self) -> None:
@@ -123,12 +133,22 @@ class ClaudeCLI:
             note, self.handoff = self.handoff, None
             content = note + "\n\n" + content if isinstance(content, str) else [{"type": "text", "text": note}] + content
         answer = []
-        with self.lock:
+        if not self.lock.acquire(timeout=5):  # an old answer never finished (abandoned): kill it and go on
+            print(time.strftime("%H:%M:%S"), "light house: previous answer stuck, restarting claude")
+            self.stop()
+            self.lock.acquire(timeout=10)
+        try:
             if self.proc is None or self.proc.poll() is not None:
                 self._start()
+            msg = json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n"
+            try:
+                self.proc.stdin.write(msg)
+                self.proc.stdin.flush()
+            except OSError:  # it was closed under us (a mode killed it?): a new one, same conversation
+                self._start()
+                self.proc.stdin.write(msg)
+                self.proc.stdin.flush()
             proc = self.proc
-            proc.stdin.write(json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n")
-            proc.stdin.flush()
             for line in proc.stdout:
                 try:
                     e = json.loads(line)
@@ -142,6 +162,9 @@ class ClaudeCLI:
                 elif e.get("type") == "result":
                     break
             self.log.append(f"ST: {said}\nJARVIS: {''.join(answer).strip()}")
+        finally:
+            if self.lock.locked():
+                self.lock.release()
 
 
 _cli = ClaudeCLI()
@@ -162,7 +185,7 @@ def ask(content, timeout: int = 300, session: str | None = None) -> str:
         if session:  # a side task: its own one-shot claude, the main one stays free
             text = content if isinstance(content, str) else content[0]["text"]
             import shutil
-            r = subprocess.run([shutil.which("claude") or "claude", "-p", text, "--model", a.get("model") or "claude-haiku-5-5",
+            r = subprocess.run([shutil.which("claude") or "claude", "-p", text, "--model", a["model"] if str(a.get("model", "")).startswith("claude") else "claude-haiku-5-5",
                                 "--dangerously-skip-permissions"], cwd=a.get("workspace") or None, capture_output=True,
                                text=True, encoding="utf-8", timeout=timeout,
                                creationflags=subprocess.CREATE_NO_WINDOW)
@@ -240,7 +263,7 @@ _last_restart = 0.0
 def restart() -> bool:
     """Runs your restart_command (if you set one), at most every 5 minutes."""
     global _last_restart
-    command = _agent().get("restart_command")
+    command = _agent().get("restart_command") if _agent()["kind"] != "claude-cli" else None  # light house: never start OpenClaw
     if not command or time.time() - _last_restart < 300:
         return False
     _last_restart = time.time()

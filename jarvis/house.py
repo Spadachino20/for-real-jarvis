@@ -32,36 +32,42 @@ def where() -> str:
     return "light" if settings.load()["agent"]["kind"] == "claude-cli" else "big"
 
 
+def openclaw_cli_session(key: str = "agent:main:main") -> str | None:
+    """The `claude` conversation OpenClaw runs your main chat in (read straight from its database, no gateway)."""
+    import json
+    import sqlite3
+    db = Path.home() / ".openclaw" / "agents" / "main" / "agent" / "openclaw-agent.sqlite"
+    try:
+        c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        row = c.execute("select entry_json from session_nodes where session_key = ?", (key,)).fetchone()
+        return (json.loads(row[0]).get("cliSessionIds") or {}).get("claude-cli") if row else None
+    except Exception as e:  # noqa: BLE001
+        print("house: couldn't read OpenClaw's session:", e)
+        return None
+
+
 def to_light() -> None:
-    """Game time: grab the last talk from OpenClaw, close it, answer from one `claude`."""
+    """Game time: close OpenClaw and answer from one `claude` that RESUMES OpenClaw's own conversation:
+    the same thread, the same memory, just a lighter house."""
     big = settings.load().get("agent_openclaw")
     if not big or where() == "light":
         return
     with _moving:
-        recent = []
-        try:
-            from .panel import gateway
-            h = gateway().call("chat.history", {"sessionKey": big["session"], "limit": 30})
-            for m in (h.get("messages", h) if isinstance(h, dict) else h)[-30:]:
-                c = m.get("content")
-                text = " ".join(p.get("text", "") for p in c if p.get("type") == "text") if isinstance(c, list) else str(c or "")
-                if text.strip() and m.get("role") in ("user", "assistant"):
-                    recent.append(("ST: " if m["role"] == "user" else "JARVIS: ") + text.strip()[:400])
-        except Exception as e:  # noqa: BLE001 — move anyway; his memory files still have the past
-            print("house: couldn't read the last talk:", e)
-        brain._cli.handoff = ("[You just moved to your light house (game mode: OpenClaw is closed to free RAM). Same you, "
-                              "same files. This is what you and ST were just talking about:]\n" + "\n".join(recent[-20:]))
+        if sid := openclaw_cli_session():
+            (settings.DATA / "light-session.txt").write_text(sid)
+        brain._cli.stop()
+        brain._cli.handoff = "[You moved to your light house: game mode, OpenClaw is closed to free RAM. Same you, same conversation.]"
         brain._cli.log = []
         settings.save("agent", {**big, "kind": "claude-cli", "model": "claude-haiku-5-5",
                                 "workspace": big.get("workspace") or str(Path.home() / "jarvis")})
         _gateway_procs()
-        print(time.strftime("%H:%M:%S"), "house: moved to the light house")
+        print(time.strftime("%H:%M:%S"), "house: moved to the light house, conversation", sid)
     threading.Thread(target=brain._warm_cli, daemon=True).start()
 
 
 def to_big() -> None:
-    """Back from the game: start OpenClaw; he keeps answering from the light house until it's up, then moves home
-    and leaves OpenClaw a note with what you talked about while you played."""
+    """Back from the game: start OpenClaw; he keeps answering from the light house until it's up. OpenClaw resumes
+    the same `claude` conversation, so what you said while playing is already in it."""
     big = settings.load().get("agent_openclaw")
     if not big or where() == "big" or _moving.locked():
         return
@@ -77,17 +83,10 @@ def to_big() -> None:
         else:
             print("house: OpenClaw didn't come up; staying in the light house")
             return
-        time.sleep(10)
-        if brain._cli.log:
-            try:
-                from .panel import gateway
-                gateway().call("chat.inject", {"sessionKey": big["session"], "label": "light house", "message":
-                               "[While ST played, you answered from your light house. What you talked about:]\n"
-                               + "\n".join(brain._cli.log[-20:])[-6000:]})
-            except Exception as e:  # noqa: BLE001
-                print("house: couldn't hand the talk back:", e)
-        settings.save("agent", big)
-        brain._cli.stop()  # free its ~300 MB
+        time.sleep(20)  # let it finish loading before it gets questions
+        with brain._cli.lock:  # never mid-answer
+            settings.save("agent", big)
+            brain._cli.stop()  # free its ~300 MB; OpenClaw takes the conversation from here
         brain._cli.log = []
         print(time.strftime("%H:%M:%S"), "house: back home (OpenClaw)")
 

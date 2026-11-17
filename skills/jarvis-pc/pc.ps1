@@ -1,4 +1,4 @@
-# For Real J.A.R.V.I.S. - PC shortcuts for your agent. Every action answers in one line with what got done.
+﻿# For Real J.A.R.V.I.S. - PC shortcuts for your agent. Every action answers in one line with what got done.
 # Usage: pc.ps1 <action> [argument]
 #   music status|play|pause|next|previous      (real state from Windows, no guessing)
 #   volume up|down|mute [steps]                 (each step = 2 %)
@@ -38,7 +38,10 @@ function CloseThese([string[]]$names, [datetime]$since = [datetime]::MinValue) {
     # never our own parents: the agent may run on a CLI with the same name (e.g. claude); killing it kills this mode
     $mine = @(); $id = $PID
     while ($id -and $mine -notcontains $id) { $mine += $id; $id = (Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue).ParentProcessId }
-    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since -and $mine -notcontains $_.Id })
+    # nor JARVIS's own light-house `claude` (its parent is the orb's python)
+    $orb = @(Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue | % ProcessId)
+    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since -and $mine -notcontains $_.Id -and
+        $orb -notcontains (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction SilentlyContinue).ParentProcessId })
     if (-not $p) { return }
     if ($p | ? ProcessName -eq steam) { Start-Process "steam://exit" }
     $p | ? ProcessName -notmatch '^steam' | Stop-Process -Force -ErrorAction SilentlyContinue
