@@ -202,8 +202,11 @@ def app(with_voice: bool) -> None:
 
     def gesture(name: str) -> None:
         import ctypes
-        if name == "puño":
-            stop_all()
+        if name == "puño":  # busy: stop him; idle: minimize the window in front
+            if turn.locked() or (parts["ears"] and parts["ears"].speaking):
+                stop_all()
+            else:
+                ctypes.windll.user32.ShowWindow(ctypes.windll.user32.GetForegroundWindow(), 6)  # SW_MINIMIZE
         elif name == "palma":  # music play/pause (any player)
             ctypes.windll.user32.keybd_event(0xB3, 0, 0, 0)
             ctypes.windll.user32.keybd_event(0xB3, 0, 2, 0)
@@ -211,11 +214,6 @@ def app(with_voice: bool) -> None:
             key = 0xB0 if name == "barrer derecha" else 0xB1
             ctypes.windll.user32.keybd_event(key, 0, 0, 0)
             ctypes.windll.user32.keybd_event(key, 0, 2, 0)
-        elif name == "dos dedos":  # screenshot: Win+Shift+S, pick the area, it's on the clipboard
-            for k in (0x5B, 0x10, 0x53):
-                ctypes.windll.user32.keybd_event(k, 0, 0, 0)
-            for k in (0x53, 0x10, 0x5B):
-                ctypes.windll.user32.keybd_event(k, 0, 2, 0)
         elif name == "cuernos":  # settings "horns_mode" (default: juego)
             from .panel import run_mode
             if mode := next((m for m in settings.modes() if m.get("id") == settings.load().get("horns_mode", "juego")), None):

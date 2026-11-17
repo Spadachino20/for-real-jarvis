@@ -206,14 +206,13 @@ you visit can press them.
 ### Hand gestures (webcam)
 
 `python -m jarvis.hands` opens a test window. Hold a gesture and press its number to record it from your own
-camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **3** V, **4** thumbs up, **5**/**6** swipe right/left, **7** horns,
+camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **4** thumbs up, **5**/**6** swipe right/left, **7** horns,
 and **0** while you type normally, so typing never fires anything. Then set `"gestures": true`.
 
 | Gesture | What it does |
 |---|---|
-| ✊ fist (0.4 s) | stops everything: the voice, his thinking and tools, and tells your agent what you actually heard |
+| ✊ fist (0.4 s) | while he talks or thinks: stops everything (voice, thinking, tools) and tells your agent what you heard; otherwise minimizes the window in front |
 | ✋ open palm (1 s) | play/pause music |
-| ✌️ V (1 s) | screenshot (Win+Shift+S) |
 | 👍 thumbs up (1 s) | "yes" to his question |
 | 🤘 horns (1 s) | starts `horns_mode` |
 | swipe right / left (trained with 5 / 6) | next / previous song |

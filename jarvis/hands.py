@@ -19,7 +19,7 @@ SWIPES = settings.DATA / "swipes.npz"
 WINDOW, STEPS, MIN_DX = 0.6, 8, 0.12  # a swipe: 0.6 s of path, moving at least 12% of the picture sideways
 HOLD_SEC = 1.0
 QUICK = {"puño": 0.4}  # stopping him shouldn't wait a whole second
-CLASSES = {ord("0"): "nada", ord("1"): "puño", ord("2"): "palma", ord("3"): "dos dedos", ord("4"): "pulgar arriba",
+CLASSES = {ord("0"): "nada", ord("1"): "puño", ord("2"): "palma", ord("4"): "pulgar arriba",
            ord("5"): "barrer derecha", ord("6"): "barrer izquierda", ord("7"): "cuernos"}
 # moving gestures: (axis 0 = x / 1 = y, sign). In the picture y grows downward.
 MOVES = {"barrer derecha": (0, 1), "barrer izquierda": (0, -1)}
@@ -162,7 +162,7 @@ def test_window(camera: int = 0) -> None:
     cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
     last, rec, t0 = ("", 0.0), (None, 0.0), time.time()
-    print("0 nada (escribir) | 1 puño | 2 palma | 3 dos dedos | 4 pulgar arriba | 5 barrer der | 6 barrer izq | 7 cuernos | Esc salir", flush=True)
+    print("0 nada (escribir) | 1 puño | 2 palma | 4 pulgar arriba | 5 barrer der | 6 barrer izq | 7 cuernos | Esc salir", flush=True)
     while True:
         ok, frame = cam.read()
         if not ok:
