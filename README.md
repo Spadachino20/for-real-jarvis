@@ -207,7 +207,7 @@ you visit can press them.
 
 `python -m jarvis.hands` opens a test window. Hold a gesture and press its number to record it from your own
 camera angle (even pointing down at the keyboard): **1** fist, **2** open palm, **4** thumbs up, **5**/**6** swipe right/left, **7** horns,
-and **0** while you type normally, so typing never fires anything. Then set `"gestures": true`.
+and **0** while you type normally, so typing never fires anything. Then set `"gestures": true`. Say "apagá la cámara" / "prendé la cámara" (or "camera off / on") to pause them; while off, the webcam is released.
 
 | Gesture | What it does |
 |---|---|

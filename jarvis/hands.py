@@ -16,6 +16,7 @@ from . import settings
 
 SAMPLES = settings.DATA / "gestures.npz"
 SWIPES = settings.DATA / "swipes.npz"
+CAMERA_OFF = settings.DATA / "camera-off"  # exists = eyes closed ("apagá la cámara")
 WINDOW, STEPS, MIN_DX = 0.6, 8, 0.12  # a swipe: 0.6 s of path, moving at least 12% of the picture sideways
 HOLD_SEC = 1.0
 QUICK = {"puño": 0.4}  # stopping him shouldn't wait a whole second
@@ -128,10 +129,12 @@ def watch(on_gesture, camera: int = 0) -> None:
     det, mp = landmarker()
     clf, hold, sweeps, t0 = Classifier(), Hold(), Sweeps(), time.time()
     while True:
+        while CAMERA_OFF.exists():
+            time.sleep(1)
         cam = cv2.VideoCapture(camera, cv2.CAP_DSHOW)
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
-        while (ok := cam.read())[0]:
+        while not CAMERA_OFF.exists() and (ok := cam.read())[0]:
             frame, now = cv2.flip(ok[1], 1), time.time()
             r = det.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)),
                                      int((now - t0) * 1000))
@@ -151,6 +154,8 @@ def watch(on_gesture, camera: int = 0) -> None:
                     print("gesture action failed:", e)
             time.sleep(max(0.0, 0.08 - (time.time() - now)))
         cam.release()
+        if CAMERA_OFF.exists():
+            continue
         time.sleep(5)  # camera busy (a video call?) or unplugged: try again
 
 

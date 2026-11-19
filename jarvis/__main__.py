@@ -37,6 +37,15 @@ def quick_reply(text: str, lang: str) -> str | None:
     if re.search(r"\b(qu[eé] (d[ií]a|fecha) es( hoy)?|what('?s| is) (the date|today)|what day is it)\b", t):
         return (f"Hoy es {days[now.weekday()]} {now.day} de {months[now.month - 1]}, señor." if es
                 else f"Today is {now:%A, %B} {now.day}, sir.")
+    if re.search(r"c[aá]mara|camera", t) and re.search(
+            r"\b(apag|desactiv|quit|cerr|prend|encend|activ|turn|switch|disable|enable|stop|start)|\b(on|off)\b", t):
+        off = re.search(r"\b(apag|desactiv|quit|cerr|disable|stop)|\boff\b", t)
+        from .hands import CAMERA_OFF
+        if off:
+            CAMERA_OFF.touch()
+            return "Cámara apagada, señor." if es else "Camera off, sir."
+        CAMERA_OFF.unlink(missing_ok=True)
+        return "Cámara encendida, señor." if es else "Camera on, sir."
     return None
 
 
