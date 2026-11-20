@@ -38,9 +38,11 @@ def quick_reply(text: str, lang: str) -> str | None:
         return (f"Hoy es {days[now.weekday()]} {now.day} de {months[now.month - 1]}, señor." if es
                 else f"Today is {now:%A, %B} {now.day}, sir.")
     if re.search(r"c[aá]mara|camera", t) and re.search(
-            r"\b(apag|desactiv|quit|cerr|prend|encend|activ|turn|switch|disable|enable|stop|start)|\b(on|off)\b", t):
-        off = re.search(r"\b(apag|desactiv|quit|cerr|disable|stop)|\boff\b", t)
+            r"\b(apag|desactiv|quit|cerr|cierr|prend|encend|activ|turn|switch|disable|enable|stop|start)|\b(on|off)\b", t):
+        off = re.search(r"\b(apag|desactiv|quit|cerr|cierr|disable|stop)|\boff\b", t)
         from .hands import CAMERA_OFF
+        from .brain import note
+        note(f"turned the gesture camera {'off' if off else 'on'} (he asked by voice)")
         if off:
             CAMERA_OFF.touch()
             return "Cámara apagada, señor." if es else "Camera off, sir."
@@ -176,7 +178,7 @@ def app(with_voice: bool) -> None:
             else:
                 from .panel import run_mode
                 title = mode.get("title") or mode["id"]
-                reply = run_mode(mode["id"]) or (f"Modo {title} activado, señor." if es else f"Activating {mode.get('title_en', 'work' if want == 'auto' else title)} mode, sir.")  # claps are deliberate: no "shall I?"
+                reply = run_mode(mode["id"], by="a double clap") or (f"Modo {title} activado, señor." if es else f"Activating {mode.get('title_en', 'work' if want == 'auto' else title)} mode, sir.")  # claps are deliberate: no "shall I?"
             orb.show("JARVIS", reply)
             parts["ears"].speak(reply)
         finally:
@@ -226,7 +228,7 @@ def app(with_voice: bool) -> None:
         elif name == "cuernos":  # settings "horns_mode" (default: juego)
             from .panel import run_mode
             if mode := next((m for m in settings.modes() if m.get("id") == settings.load().get("horns_mode", "juego")), None):
-                said(run_mode(mode["id"]) or f"Activating {mode.get('title_en', mode.get('title') or mode['id'])} mode, sir.")
+                said(run_mode(mode["id"], by="the horns gesture") or f"Activating {mode.get('title_en', mode.get('title') or mode['id'])} mode, sir.")
         elif name == "pulgar arriba":  # "yes" to his question
             from .panel import _pending
             if _pending:

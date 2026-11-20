@@ -595,11 +595,12 @@ class Ears:
             except Exception:  # noqa: BLE001 — the watchdog closed the old recorder
                 continue
             called, request = split_wake(text)
-            if not called and not self.awake() and not self.during_his_voice() and settings.load().get("stt") == "parakeet":
+            if (not called and len(text.split()) <= 2 and not self.awake() and not self.during_his_voice()
+                    and settings.load().get("stt") == "parakeet"):
                 from . import stt  # Parakeet can drop the name entirely (""), so this runs before the junk check
                 if stt.says_name(getattr(self.rec, "last_transcription_bytes", None)):
                     print(time.strftime("%H:%M:%S"), "name found by the second check:", repr(text))
-                    called, request = True, ("" if len(text.split()) <= 3 else text)
+                    called, request = True, ""
             if not called and (len(text) < 2 or is_junk(text)):
                 continue
             print(time.strftime("%H:%M:%S"), "heard:", text[:80])

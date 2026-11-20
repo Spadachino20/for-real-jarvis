@@ -506,7 +506,7 @@ def mode_reply(text: str, lang: str = "en") -> str | None:
     return run_mode(mode["id"]) or (f"Modo {mode.get('title') or mode['id']}, señor." if es else f"{mode.get('title') or mode['id']} mode, sir.")
 
 
-def run_mode(mode_id: str, leaving: bool = False) -> str | None:
+def run_mode(mode_id: str, leaving: bool = False, by: str = "the panel or a voice shortcut") -> str | None:
     mode = next((m for m in settings.modes() if m.get("id") == mode_id), None)
     if mode is None:
         return "Unknown mode."
@@ -528,6 +528,7 @@ def run_mode(mode_id: str, leaving: bool = False) -> str | None:
                     result += "\nJARVIS: " + brain.ask("[PANEL] " + mode["tell_agent"], timeout=120)
                 _mode["active"] = mode_id if mode.get("exit_message") else _mode["active"]
             _mode.update(state="done", result=result)
+            brain.note(f"{'left' if leaving else 'ran'} the '{mode.get('title') or mode_id}' mode (started by {by}): {result[:200]}")
         except Exception as e:  # noqa: BLE001
             _mode.update(state="error", result=f"{type(e).__name__}: {e}"[:300])
 

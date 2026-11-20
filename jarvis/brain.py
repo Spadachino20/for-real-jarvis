@@ -49,7 +49,20 @@ def _headers(session: str | None = None) -> dict:
 
 STOPPED = threading.Event()  # you cut him off (fist): no retry, no "agent down"
 CHAT_TAG = "[CHAT - typed, not spoken: markdown is fine] "  # so the agent tells typing from voice
+_notes: list[str] = []  # what the orb did by itself since the agent's last message (he'd deny it otherwise)
 _history: list[dict] = []  # what the panel's chat shows for non-OpenClaw agents (and the context for plain "openai" ones)
+
+
+def note(text: str) -> None:
+    _notes.append(f"{time.strftime('%H:%M')} {text}")
+
+
+def _with_notes(text: str) -> str:
+    if not _notes:
+        return text
+    pre = "[Meanwhile the orb did this by itself, without asking you: " + "; ".join(_notes) + ". It was real; own it if he asks.] "
+    _notes.clear()
+    return pre + text
 
 
 def _messages(content) -> list[dict]:
@@ -309,7 +322,7 @@ class Brain:
         from .voice import voice_tag
         if alive():
             try:
-                reply = ask(with_screen((voice_tag() if voice else CHAT_TAG) + text))
+                reply = ask(with_screen(_with_notes((voice_tag() if voice else CHAT_TAG) + text)))
                 if reply:
                     return reply
             except Exception as e:  # noqa: BLE001
@@ -323,7 +336,7 @@ class Brain:
             yield self._down()
             return
         STOPPED.clear()
-        content, any_ = with_screen((voice_tag() if voice else CHAT_TAG) + text), False
+        content, any_ = with_screen(_with_notes((voice_tag() if voice else CHAT_TAG) + text)), False
         try:
             for sentence in sentences(ask_stream(content)):
                 if STOPPED.is_set():
