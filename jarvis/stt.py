@@ -53,8 +53,8 @@ def says_name(audio) -> bool:
     if audio is None or not len(audio):
         return False
     head = np.asarray(audio, np.float32)[:40000]
-    if np.sqrt((head ** 2).mean()) < settings.load().get("name_check_min_rms", 0.006):
-        return False  # noise or silence: a hinted Whisper would "hear" the name in it (your voice: ~0.013-0.02)
+    if np.sqrt((head ** 2).mean()) < settings.load().get("name_check_min_rms", 0.004):
+        return False  # noise or silence: a hinted Whisper would "hear" the name in it (your voice: ~0.007-0.02)
     segs, _ = _whisper().transcribe(head, beam_size=5, initial_prompt=f"{settings.identity()['short'].title()}.",
                                     language=settings.load()["language"] if settings.load()["language"] in ("es", "en") else None)
     return split_wake(" ".join(s.text for s in segs))[0]

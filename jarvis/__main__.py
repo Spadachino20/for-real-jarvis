@@ -14,6 +14,9 @@ import re
 import threading
 
 from . import settings
+from . import lean
+
+lean.install()  # before anything imports RealtimeSTT: no torch, no onnx arenas (~300 MB less)
 
 if sys.stdout is None:  # pythonw (no console): everything goes to the log
     settings.DATA.mkdir(exist_ok=True)

@@ -446,7 +446,7 @@ class Ears:
             model=s["whisper_model"], language=_lang(), device=_device(), compute_type="float16" if _device() == "cuda" else "int8", beam_size=5,  # 1 garbles short words ("sí" -> "C")
             initial_prompt=("Oye Jarvis, sí, dale, procedé, poné el modo trabajo, por favor. " if _lang() == "es" else "") +  # a Spanish prompt keeps Whisper in Spanish
             f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,
-            silero_sensitivity=0.4, silero_backend="official_onnx", silero_deactivity_detection=True,
+            silero_sensitivity=0.4, silero_backend="raw_onnx" if s.get("stt") == "parakeet" else "official_onnx",  # raw: no torch (jarvis/lean.py) silero_deactivity_detection=True,
             webrtc_sensitivity=3, post_speech_silence_duration=s.get("silence_sec", 0.45), min_length_of_recording=0.4,
             on_recording_start=self._starts, on_recording_stop=self._stops, on_recorded_chunk=self._audio,
             no_log_file=True)
