@@ -39,6 +39,27 @@ def engine() -> OnnxParakeet:
     return OnnxParakeet(TranscriptionEngineConfig(model="parakeet"))
 
 
+@cache
+def _whisper():
+    from faster_whisper import WhisperModel
+    return WhisperModel("base", device="cpu", compute_type="int8")
+
+
+def says_name(audio) -> bool:
+    """Parakeet can't be told the name: "Jarvis" alone comes out "Java's". When it found no name, a small
+    Whisper hinted with the name listens to the first 2.5 s only (~0.3 s on CPU)."""
+    import numpy as np
+    from .voice import split_wake
+    if audio is None or not len(audio):
+        return False
+    head = np.asarray(audio, np.float32)[:40000]
+    if np.sqrt((head ** 2).mean()) < settings.load().get("name_check_min_rms", 0.006):
+        return False  # noise or silence: a hinted Whisper would "hear" the name in it (your voice: ~0.013-0.02)
+    segs, _ = _whisper().transcribe(head, beam_size=5, initial_prompt=f"{settings.identity()['short'].title()}.",
+                                    language=settings.load()["language"] if settings.load()["language"] in ("es", "en") else None)
+    return split_wake(" ".join(s.text for s in segs))[0]
+
+
 if __name__ == "__main__":
     import numpy as np
     f = {r"^hello\W*$": "Hacelo.", r"\brama\b": "RAM"}
