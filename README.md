@@ -238,6 +238,7 @@ jarvis/
   __main__.py   starts the orb, the ears and the panel
   brain.py      talks to your agent (OpenAI-compatible API on localhost)
   voice.py      ears (RealtimeSTT: Silero VAD + faster-whisper) and voice (Kokoro / ElevenLabs)
+  stt.py        optional Parakeet TDT v3 ears: "stt": "parakeet" + pip install "onnx-asr[cpu,hub]" (~10x faster on CPU)
   widget.py     the orb (tkinter)
   panel.py      the panel's server (Python's http.server) + panel.html
   gateway.py    OpenClaw gateway client (WebSocket RPC) for tokens, automations, sessions and logs

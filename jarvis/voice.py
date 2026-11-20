@@ -438,7 +438,11 @@ class Ears:
         if s["microphone"] and index is None:
             print(f"Warning: microphone '{s['microphone']}' not found, using the Windows default.")
         self._last_audio = time.time()
-        return AudioToTextRecorder(
+        extra = {}
+        if s.get("stt") == "parakeet":
+            from . import stt
+            extra = {"transcription_executor": stt.engine()}  # runs in this process: no Whisper worker at all
+        return AudioToTextRecorder(**extra,
             model=s["whisper_model"], language=_lang(), device=_device(), compute_type="float16" if _device() == "cuda" else "int8", beam_size=5,  # 1 garbles short words ("sí" -> "C")
             initial_prompt=("Oye Jarvis, sí, dale, procedé, poné el modo trabajo, por favor. " if _lang() == "es" else "") +  # a Spanish prompt keeps Whisper in Spanish
             f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,

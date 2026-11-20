@@ -30,6 +30,7 @@ DEFAULTS = {
     "graph": "",                               # path to an .html graph of your notes (e.g. graphify-out/graph.html): adds a Graph tab to the panel
     "orb_gain": 8.0,                           # how much the orb rings open with the volume
     "gestures": False,                         # webcam hand gestures (train first: python -m jarvis.hands)
+    "stt": "whisper",                          # "parakeet" = ~10x faster on CPU, same accuracy (jarvis/stt.py)
     "whisper_model": "small",                  # "base" = faster on CPU; with a GPU "large-v3-turbo" is fast and understands more
     "stt_device": "auto",                      # "auto" uses an NVIDIA GPU if there is one, "cpu" / "cuda" to force it
     "silence_sec": 0.45,                       # silence before JARVIS takes your sentence as finished (lower = faster, may cut you off)
