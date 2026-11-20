@@ -552,6 +552,8 @@ function drawStatus(d) {
 async function refresh() {
   try {
     const d = await get("/api/status"); drawStatus(d);
+    if (lookId === null) lookId = d.look;  // color or panel changed: reload by itself (no F5), never over a draft
+    else if (d.look && d.look !== lookId && !$("chatText").value.trim()) location.reload();
     if (showId === null) showId = d.show?.id ?? 0;
     else if (d.show && d.show.id !== showId) go("show");  // something new to look at
   }
@@ -559,7 +561,7 @@ async function refresh() {
 }
 
 /* ---------- show me: a tiny markdown renderer (headings, lists, tables, bold, code, links) ---------- */
-let showId = null;
+let showId = null, lookId = null;
 function md(src) {
   const inline = s => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');

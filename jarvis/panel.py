@@ -636,7 +636,12 @@ def status(orb: Callable[[], dict]) -> dict:
             "main": _cached("main", 6, main_session) if up and kind() == "openclaw" else {},
             "timings": _cached("timings", 3, timings), "music": _cached("music", 8, music),
             "pc": _cached("pc", 5, pc), "crashes": _cached("crashes", 300, crashes),
-            "modes": modes(), "mode": _mode, "chat": _chat, "show": {"id": _show["id"]}}
+            "modes": modes(), "mode": _mode, "chat": _chat, "show": {"id": _show["id"]}, "look": look()}
+
+
+def look() -> str:
+    """Changes when the panel's looks do (data/identity.json or panel.html): the open panel reloads itself."""
+    return "|".join(str(p.stat().st_mtime_ns) if p.exists() else "-" for p in (settings.IDENTITY, HERE / "panel.html"))
 
 
 OPENCLAW_ONLY = {"/api/tokens": ("tokens", 60, tokens), "/api/automations": ("automations", 8, automations),
