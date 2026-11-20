@@ -39,6 +39,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{{JARVIS_HOME}}\skills\jarv
 ## Rules
 
 - The shortcut's output IS the verification: no screenshot needed to confirm music or volume.
+- Say only what the output confirms. `open` answers "opened (running: ...)" only when the app really is running;
+  "did NOT open" or "NOT closed" means it failed: tell him so, never "it's open". "sent to Windows" (a URL or
+  folder) means you sent it, not that you saw it.
 - "Play music" with Spotify closed: `open spotify`, wait 5 s, `music play`, `music status`.
 - `type` writes exactly what the user said (only punctuation and capitals) unless they ask you to rewrite it.
   In PowerShell the text goes in single quotes: double any `'` inside it.

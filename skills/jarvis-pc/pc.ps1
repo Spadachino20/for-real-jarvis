@@ -1,4 +1,4 @@
-﻿# For Real J.A.R.V.I.S. - PC shortcuts for your agent. Every action answers in one line with what got done.
+﻿# For Real J.A.R.V.I.S. - PC shortcuts for your agent. Every action answers in one line with what it CHECKED got done.
 # Usage: pc.ps1 <action> [argument]
 #   music status|play|pause|next|previous      (real state from Windows, no guessing)
 #   volume up|down|mute [steps]                 (each step = 2 %)
@@ -48,17 +48,45 @@ function CloseThese([string[]]$names, [datetime]$since = [datetime]::MinValue) {
     $p.ProcessName | select -Unique
 }
 
-function OpenThing([string]$target) {
-    # a path (.exe, .lnk, folder), a URL/URI, or the name of an app in the Start menu
-    if ($target -match '\.exe$' -and (Test-Path $target)) {
-        $exe = [IO.Path]::GetFileNameWithoutExtension($target)
-        if (Get-Process $exe -ErrorAction SilentlyContinue) { return "$exe was already open" }
-        Start-Process $target -WorkingDirectory (Split-Path $target); return "$exe opened"
+function Launch([string]$target) {
+    # explorer starts it, not us: agents (OpenClaw) run commands inside a Windows job that kills
+    # whatever the command opened as soon as it ends. Started by explorer, the app outlives the command.
+    Start-Process explorer.exe -ArgumentList "`"$target`""
+}
+
+function Settled([string]$name, [datetime]$t0) {
+    # the honest answer: waits up to 8 s for the program to be running (and still running a second later)
+    $skip = '^(explorer|conhost|powershell|pwsh|cmd|RuntimeBroker|backgroundTaskHost|dllhost|svchost|SearchHost|ApplicationFrameHost|WerFault|Update)$'
+    $seen = $null
+    for ($i = 0; $i -lt 16; $i++) {
+        Start-Sleep -Milliseconds 500
+        $new = @(Get-Process | ? { try { $_.StartTime -gt $t0 } catch { $false } } | ? ProcessName -notmatch $skip)
+        $hit = @($new | ? ProcessName -like "*$name*")
+        if (-not $hit) { $hit = @($new | ? MainWindowHandle -ne 0) }
+        if ($hit -and $seen) { return ($hit.ProcessName | select -Unique) -join ', ' }
+        $seen = [bool]$hit
     }
-    if ((Test-Path $target) -or $target -match '^[a-z][a-z0-9+.-]*:') { Start-Process $target; return "$([IO.Path]::GetFileNameWithoutExtension($target)) opened" }
-    $app = Get-StartApps | ? Name -like "*$target*" | sort { $_.Name.Length } | select -First 1
-    if (-not $app) { return "no app called '$target' in the Start menu" }
-    Start-Process "shell:AppsFolder\$($app.AppID)"; "$($app.Name) opened"
+}
+
+function OpenThing([string]$target) {
+    # a path (.exe, .lnk, folder), a URL/URI, or the name of an app in the Start menu.
+    # Apps answer "opened" only once they're really running; otherwise they say so.
+    $name, $what = $null, $target
+    if ($target -match '\.(exe|lnk)$' -and (Test-Path $target)) {
+        $name = [IO.Path]::GetFileNameWithoutExtension($target)
+    } elseif ((Test-Path $target) -or $target -match '^[a-z][a-z0-9+.-]*:') {
+        Launch $target; return "$([IO.Path]::GetFileNameWithoutExtension($target)) sent to Windows to open"  # folder / URL: nothing to check
+    } else {
+        $app = Get-StartApps | ? Name -like "*$target*" | sort { $_.Name.Length } | select -First 1
+        if (-not $app) { return "no app called '$target' in the Start menu" }
+        $name, $what = $app.Name, "shell:AppsFolder\$($app.AppID)"
+    }
+    $short = ($name -split '\s')[0]
+    if (Get-Process "*$short*" -ErrorAction SilentlyContinue | ? MainWindowHandle -ne 0) { return "$name was already open" }
+    $t0 = (Get-Date).AddSeconds(-1)
+    Launch $what
+    if ($running = Settled $short $t0) { return "$name opened (running: $running)" }
+    "$name did NOT open: Windows got the order but no program stayed running. Don't tell him it's open."
 }
 
 function PlayPlaylist([string]$uri, [string]$name) {
@@ -190,6 +218,9 @@ switch ($Action.ToLower()) {
         if (-not $ps) { "No open program called '$Arg'."; break }
         $ps | % { $null = $_.CloseMainWindow() }; Start-Sleep 2
         $ps | ? { -not $_.HasExited } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep 1
+        $left = @($ps | ? { -not $_.HasExited })
+        if ($left) { "NOT closed (still running): $(($left.ProcessName | select -Unique) -join ', ')"; break }
         "Closed: $(($ps.ProcessName | select -Unique) -join ', ')"
     }
     "find" {

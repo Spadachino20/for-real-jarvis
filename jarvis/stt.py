@@ -5,10 +5,20 @@ It's handed to RealtimeSTT as transcription_executor, so it runs in JARVIS's own
 """
 from __future__ import annotations
 
+import re
 from functools import cache
 
 from RealtimeSTT.transcription_engines.base import (BaseTranscriptionEngine, TranscriptionEngineConfig,
                                                     TranscriptionInfo, TranscriptionResult)
+
+from . import settings
+
+
+def fix(text: str, fixes: dict[str, str]) -> str:
+    """Settings "stt_fixes" {regex: replacement}: what Parakeet keeps mishearing (it has no prompt to bias it)."""
+    for pattern, repl in fixes.items():
+        text = re.sub(pattern, repl, text, flags=re.I)
+    return text
 
 
 class OnnxParakeet(BaseTranscriptionEngine):
@@ -20,6 +30,7 @@ class OnnxParakeet(BaseTranscriptionEngine):
 
     def transcribe(self, audio, language=None, use_prompt=True, **kwargs) -> TranscriptionResult:
         text = self.model.recognize(self._normalize_audio(audio), sample_rate=16000).strip() if len(audio) else ""
+        text = fix(text, settings.load().get("stt_fixes") or {})
         return TranscriptionResult(text=text, info=TranscriptionInfo(language=language, language_probability=1.0 if text else 0.0))
 
 
@@ -30,6 +41,9 @@ def engine() -> OnnxParakeet:
 
 if __name__ == "__main__":
     import numpy as np
+    f = {r"^hello\W*$": "Hacelo.", r"\brama\b": "RAM"}
+    assert fix("Hello.", f) == "Hacelo." and fix("Hello Jarvis", f) == "Hello Jarvis"
+    assert fix("Cuánta memoria Rama tengo", f) == "Cuánta memoria RAM tengo" and fix("Ramallo", f) == "Ramallo"
     e = engine()
     assert engine() is e
     assert e.transcribe(np.zeros(0, np.float32)).text == ""
