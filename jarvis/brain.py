@@ -285,6 +285,29 @@ def restart() -> bool:
     return True
 
 
+WHO = ("[SETUP - reply with ONE line of JSON and nothing else] The voice orb on this PC is about to show your name. "
+       'Reply {"name": "<the name you call yourself, as written in your persona, e.g. F.R.I.D.A.Y.>", '
+       '"color": "<#rrggbb, ONLY if your persona names a color>"}. No name of your own: reply {}')
+
+
+def adopt_identity(reply: str) -> dict:
+    """The orb takes your agent's own name (Hermes, OpenClaw, any): writes data/identity.json once.
+    Written even when the agent has no name ({}), so it isn't asked again; delete the file to ask again."""
+    m = re.search(r"\{.*?\}", reply or "", re.S)
+    try:
+        got = json.loads(m.group(0)) if m else {}
+    except ValueError:
+        got = {}
+    ident = {}
+    name = str(got.get("name") or "").strip()
+    if 0 < len(name) <= 24 and re.search(r"[A-Za-z0-9]", name):
+        ident = {"name": name, "letter": re.sub(r"[^A-Za-z0-9]", "", name)[0].upper()}
+        if re.fullmatch(r"#[0-9a-fA-F]{6}", str(got.get("color") or "")):
+            ident["color"] = got["color"]
+    settings.IDENTITY.write_text(json.dumps(ident, ensure_ascii=False), encoding="utf-8")
+    return ident
+
+
 class Brain:
     def __init__(self) -> None:
         import threading
@@ -300,8 +323,11 @@ class Brain:
         for _ in range(60):  # up to 10 minutes for the agent to come up
             if alive():
                 try:
-                    ask("[WARMUP - reply only: OK]", timeout=240,
-                        session="agent:main:warmup" if _agent()["kind"] == "openclaw" else "for-real-jarvis-warmup")
+                    first = not settings.IDENTITY.exists()  # first start: the same message asks who the agent is
+                    reply = ask(WHO if first else "[WARMUP - reply only: OK]", timeout=240,
+                                session="agent:main:warmup" if _agent()["kind"] == "openclaw" else "for-real-jarvis-warmup")
+                    if first:
+                        print(time.strftime("%H:%M:%S"), "identity from your agent:", adopt_identity(reply))
                     print(time.strftime("%H:%M:%S"), "agent warmed up")
                 except Exception as e:  # noqa: BLE001
                     print("warm-up failed:", type(e).__name__)

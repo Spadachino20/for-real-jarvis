@@ -41,7 +41,7 @@ With a yes, write `{{JARVIS_HOME}}\data\identity.json` (only this file, UTF-8):
 - The orb changes within 3 seconds; the panel on its next reload (F5). Nothing to restart.
 - Desktop icon too (optional): run `{{JARVIS_HOME}}\.venv\Scripts\python.exe -m jarvis.icon` (writes
   `data\orb.ico`) and set it as the icon of the desktop shortcut that points to `Restart JARVIS.cmd`.
-- To change it later, edit the file. **To go back to J.A.R.V.I.S., delete `data\identity.json`.**
+- To change it later, edit the file. **To go back to J.A.R.V.I.S., write `{}` in `data\identity.json`** (if you delete it, the orb asks you your name again on its next start).
 
 ## Step 2 - the interview (one question at a time, short, wait for each answer)
 

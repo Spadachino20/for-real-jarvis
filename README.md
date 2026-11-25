@@ -84,15 +84,17 @@ Run it again whenever you want.
 
 ### Your agent's name and color on the orb
 
-Is your agent called F.R.I.D.A.Y., EDITH or ULTRON? During the interview it can put **its own name, letter and
-color** on the orb and the panel (and wake up to "Hey Friday"). It just writes one small file:
+Is your agent called F.R.I.D.A.Y., EDITH or ULTRON? **The first time JARVIS starts, it asks your agent its name**
+(OpenClaw, Hermes or any other) and the orb and the panel take it on: its name, its letter, its color if its persona
+has one, and it also wakes up to "Hey Friday". The interview can change it later. It's one small file:
 
 ```json
 // data/identity.json
 { "name": "F.R.I.D.A.Y.", "letter": "F", "color": "#ff8a3d" }
 ```
 
-Change it any time (or ask your agent to). Delete it to go back to J.A.R.V.I.S.
+Change it any time (or ask your agent to). Write `{}` in it to go back to J.A.R.V.I.S.; delete it and JARVIS asks your agent
+again on its next start.
 
 ## Modes
 

@@ -69,7 +69,7 @@ def save(key: str, value) -> None:
     FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-IDENTITY = DATA / "identity.json"  # your agent writes it (jarvis-personalize skill); delete it to go back to JARVIS
+IDENTITY = DATA / "identity.json"  # your agent writes it (jarvis-personalize skill); {} = J.A.R.V.I.S.; deleted = the orb asks your agent again (brain.adopt_identity)
 
 
 def identity() -> dict:
