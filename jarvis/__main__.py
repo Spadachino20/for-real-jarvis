@@ -25,8 +25,8 @@ if sys.stdout is None:  # pythonw (no console): everything goes to the log
 else:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-GREETING = {"en": ('Online, sir. Say "Hey Jarvis" or press {key}.', "Online, sir."),
-            "es": ('En línea, señor. Diga "oye Jarvis" o apriete {key}.', "En línea, señor.")}
+GREETING = {"en": ('Online, sir. Say "Hey {name}" or press {key}.', "Online, sir."),
+            "es": ('En línea, señor. Diga "oye {name}" o apriete {key}.', "En línea, señor.")}
 
 
 def quick_reply(text: str, lang: str) -> str | None:
@@ -367,7 +367,10 @@ def app(with_voice: bool) -> None:
             from .voice import ClapDetector
             parts["ears"].claps = ClapDetector(clapped)
             text, spoken = GREETING[lang]
-            orb.show("JARVIS", text.format(key=s["hotkey"].title()))
+            if not settings.IDENTITY.exists() and settings.load()["agent"]["kind"] != "claude-cli":
+                from .brain import asked
+                asked.wait(40)  # first start: it's being asked its name, so it greets with it
+            orb.show("JARVIS", text.format(key=s["hotkey"].title(), name=settings.identity()["short"].title()))
             say(spoken if not s["speak_english"] else GREETING["en"][1])
             from .voice import warm_fillers
             threading.Thread(target=warm_fillers, daemon=True).start()  # "Right away, sir" ready in memory

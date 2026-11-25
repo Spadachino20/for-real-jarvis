@@ -41,6 +41,10 @@ With a yes, write `{{JARVIS_HOME}}\data\identity.json` (only this file, UTF-8):
 - The orb changes within 3 seconds; the panel on its next reload (F5). Nothing to restart.
 - Desktop icon too (optional): run `{{JARVIS_HOME}}\.venv\Scripts\python.exe -m jarvis.icon` (writes
   `data\orb.ico`) and set it as the icon of the desktop shortcut that points to `Restart JARVIS.cmd`.
+- **Your voice:** choose the one that suits your personality (and your gender, if you have one), say which and why in one line, and with a
+  yes set `"voice"` in `{{JARVIS_HOME}}\data\settings.json` (change only that key; the next sentence already uses it). English: `bm_george` (British
+  man, calm), `bm_lewis` (British man, deep), `bm_daniel`, `am_onyx` (American man, deep), `bf_emma` (British woman), `af_heart` (American woman, warm).
+  Spanish (if `speak_english` is false): `em_alex`, `em_santa` (deep), `ef_dora` (woman).
 - To change it later, edit the file. **To go back to J.A.R.V.I.S., write `{}` in `data\identity.json`** (if you delete it, the orb asks you your name again on its next start).
 
 ## Step 2 - the interview (one question at a time, short, wait for each answer)

@@ -417,8 +417,13 @@ def restart() -> bool:
 
 
 WHO = ("[SETUP - reply with ONE line of JSON and nothing else] The voice orb on this PC is about to show your name. "
-       'Reply {"name": "<the name you call yourself, as written in your persona, e.g. F.R.I.D.A.Y.>", '
-       '"color": "<#rrggbb, ONLY if your persona names a color>"}. No name of your own: reply {}')
+       'Reply {"name": "<your name>"}: the one your persona (SOUL, IDENTITY, system prompt) gives you, e.g. F.R.I.D.A.Y., and if it '
+       'names a color of yours add "color": "#rrggbb". Add "voice", the one that suits your personality: "bm_george" (British man, calm), '
+       '"bm_lewis" (British man, deep), "am_onyx" (American man, deep), "bf_emma" (British woman), "af_heart" (American woman, warm). Only if nobody ever gave you a name, reply {}')
+WHO_AGAIN = "[SETUP - one word] What is your name, the one in your persona? Reply only with it, or with NONE if you have none."
+
+
+asked = threading.Event()  # the agent has been asked its name on this start, whatever it answered
 
 
 def adopt_identity(reply: str) -> dict:
@@ -435,6 +440,8 @@ def adopt_identity(reply: str) -> dict:
         ident = {"name": name, "letter": re.sub(r"[^A-Za-z0-9]", "", name)[0].upper()}
         if re.fullmatch(r"#[0-9a-fA-F]{6}", str(got.get("color") or "")):
             ident["color"] = got["color"]
+        if got.get("voice") in ("bm_george", "bm_lewis", "am_onyx", "bf_emma", "af_heart") and settings.load()["voice"] == settings.DEFAULTS["voice"]:
+            settings.save("voice", got["voice"])  # only if you haven't chosen one
     if not ident:
         return {}
     settings.IDENTITY.write_text(json.dumps(ident, ensure_ascii=False), encoding="utf-8")
@@ -458,12 +465,16 @@ class Brain:
                 try:
                     first = not settings.IDENTITY.exists()  # first start: the same message asks who the agent is
                     reply = ask(WHO if first else "[WARMUP - reply only: OK]", timeout=240,
-                                session=side("warmup"))
+                                session=side("who" if first else "warmup"))
                     if first:
-                        print(time.strftime("%H:%M:%S"), "identity from your agent:", adopt_identity(reply))
+                        if not (who := adopt_identity(reply)):  # small models answer {} too easily: once more, plainer
+                            name = re.sub(r"[*_`\".!\s]+$|^[*_`\"\s]+", "", ask(WHO_AGAIN, timeout=240, session=side("name")))
+                            who = adopt_identity(json.dumps({"name": name})) if len(name.split()) < 4 and not re.match("none|hermes agent", name, re.I) else {}
+                        print(time.strftime("%H:%M:%S"), "identity from your agent:", who)
                     print(time.strftime("%H:%M:%S"), "agent warmed up")
                 except Exception as e:  # noqa: BLE001
                     print("warm-up failed:", type(e).__name__)
+                asked.set()
                 return
             time.sleep(10)
 

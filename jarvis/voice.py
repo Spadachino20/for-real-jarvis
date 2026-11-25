@@ -22,6 +22,8 @@ VOICES = {
     "George (British)": "bm_george",
     "Daniel (British)": "bm_daniel",
     "Onyx (deep)": "am_onyx",
+    "Emma (British, female)": "bf_emma",
+    "Heart (American, female)": "af_heart",
     "Alex (Spanish)": "em_alex",
     "Santa (Spanish, deep)": "em_santa",
     "Dora (Spanish, female)": "ef_dora",

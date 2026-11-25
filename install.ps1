@@ -118,7 +118,7 @@ else {
 
 # 3. Libraries ------------------------------------------------------------------------------------
 Step "3/6  Libraries (the first time it downloads ~2 GB: speech recognition models)"
-Quiet { & $venvPy -c "import RealtimeSTT, kokoro_onnx, sounddevice, pyaudio, httpx, websockets, psutil, PIL" }
+Quiet { & $venvPy -c "import RealtimeSTT, faster_whisper, silero_vad, openwakeword, kokoro_onnx, sounddevice, pyaudio, httpx, websockets, psutil, PIL" }
 if ($LASTEXITCODE -eq 0) { Say "Already installed." }
 else {
     Quiet { & $venvPy -m ensurepip --upgrade } | Out-Null
@@ -137,6 +137,8 @@ foreach ($f in "kokoro-v1.0.int8.onnx", "voices-v1.0.bin") {
     if (-not (Test-Path "models\$f")) { Say "Downloading $f..."; Invoke-WebRequest "$base/$f" -OutFile "models\$f" -UseBasicParsing }
 }
 Say "Voice ready."
+Quiet { & $venvPy -c "from openwakeword.utils import download_models; download_models(['hey_jarvis'])" } | Out-Null
+if ($LASTEXITCODE -eq 0) { Say "Wake word ready." } else { Say "The wake word model didn't download: he still wakes up, a bit later." }
 
 # 5. Connect to your agent ------------------------------------------------------------------------
 Step "5/6  Connecting to your agent"

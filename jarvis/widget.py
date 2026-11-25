@@ -15,7 +15,7 @@ from typing import Callable
 BG, TRANSPARENT = "#0b1220", "#010203"
 COLORS = {"idle": "#2b6f8a", "listening": "#38e1ff", "thinking": "#ffb347",
           "speaking": "#4f9dff", "loading": "#6b7280", "mic off": "#7f1d1d"}
-from .settings import DATA
+from .settings import DATA, identity
 SCREEN = DATA / "screen.jpg"  # written on every "look at my screen"
 SIZE = 128  # canvas; with the voice the rings open up to ~63 px of radius
 TEXT = {
@@ -210,7 +210,8 @@ class Orb:
 
     def _append(self, who: str, text: str) -> None:
         self.chat.config(state="normal")
-        self.chat.insert("end", f"{who}: ", "jarvis" if who == "JARVIS" else "you")
+        shown = identity()["short"] if who == "JARVIS" else who  # your agent's own name
+        self.chat.insert("end", f"{shown}: ", "jarvis" if who == "JARVIS" else "you")
         self.chat.insert("end", text + "\n\n")
         self.chat.config(state="disabled")
         self.chat.see("end")
