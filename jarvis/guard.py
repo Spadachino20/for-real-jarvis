@@ -33,8 +33,19 @@ KINDS = {  # kind: (what does it, how a question about it sounds)
     "hidden": (r"-e(?:nc\w*)?\s+[A-Za-z0-9+/=]{40,}|FromBase64String|\bInvoke-Expression\b|\biex\b|DownloadString", r"ejecut|run|corr"),
 }
 _LOCAL = re.compile(r"127\.0\.0\.1|localhost")
-_YES = re.compile(r"^\W*(?:jarvis\W+)?(?:s[ií]p?|dale|hac[eé]lo|hazlo|confirm\w*|ok(?:ay|ey)?|claro|obvio|de una|adelante|proced\w+|manda|yes|yeah|yep|sure|do it|go ahead|"
-                  r"(?:cierra|cerr[aá]|apaga|apag[aá]|borra|borr[aá]|elimina|elimin[aá]|manda|mand[aá]|env[ií]a|envi[aá]|reinicia|reinici[aá])l[oae]s?|(?:close|send|delete) (?:it|them))\b", re.I)
+_IT = (r"(?:cierra|cerr[aá]|apaga|apag[aá]|borra|borr[aá]|elimina|elimin[aá]|manda|mand[aá]|env[ií]a|envi[aá]|reinicia|reinici[aá])l[oae]s?|(?:close|send|delete) (?:it|them)")
+_FIRST = re.compile(r"^\W*(?:jarvis\W+)?(?:s[ií]p?|dale|claro|obvio|ok(?:ay|ey)?|listo|de una|adelante|procede|proced[eé]|manda|yes|yeah|yep|sure|go ahead|" + _IT + r")\b", re.I)
+_ANYWHERE = re.compile(r"\b(?:sí|confirmo|confirmado|confirmada|dale|hac[eé]lo|hazlo|ejecut[aá]lo|i confirm|confirmed|do it|go ahead|" + _IT + r")(?!\w)", re.I)
+_ALONE = re.compile(r"^\W*(?:c|see|sim|si si)\W*$", re.I)  # how a spoken "sí" gets transcribed
+_NO = re.compile(r"\b(?:no|nop|nunca|tampoco|todav[ií]a|a[uú]n|esper\w*|par[aá]|cancel\w*|despu[eé]s|luego|ma[nñ]ana|si (?:quer|pod|pued|ten|no)\w*|not|don'?t|never|wait|stop|later|if)\b|\?", re.I)
+
+
+def says_yes(text: str) -> bool:
+    t = re.sub(r"([^\W\d_])\1{2,}", r"\1", text.strip())  # "SIIII" = "SI"
+    t = re.sub(r"\b(s[ií])[ií]+\b", r"\1", t, flags=re.I)
+    return 0 < len(t.split()) <= 10 and not _NO.search(t) and bool(_FIRST.match(t) or _ANYWHERE.search(t) or _ALONE.match(t))
+
+
 _TAGS = re.compile(r"^\s*(?:\[[^\]]*\]\s*)+")
 
 
@@ -71,7 +82,7 @@ def _read(p: Path) -> dict:
 def approved(said: str, last: str, pending: dict) -> list[str]:
     """What this sentence of his allows. last: what JARVIS had just said."""
     text = plain(said)
-    if "[OPEN MIC - overheard" in said or not _YES.match(text) or len(text.split()) > 8 or re.search(r"\bno\b", text, re.I):
+    if "[OPEN MIC - overheard" in said or not says_yes(text):
         return []
     if pending and time.time() - pending.get("time", 0) < 180:
         return list(pending.get("kinds", []))
@@ -90,12 +101,13 @@ def only_to(cmd: str, sites: list[str]) -> bool:
         any(h.lower() == s or h.lower().endswith("." + s) for s in sites) for h in hosts)
 
 
-def turn(said: str, last: str) -> None:
+def turn(said: str, last: str) -> list[str]:
     """brain.py: he just said this (called before the agent gets it)."""
     ok = approved(said, last, _read(PENDING))
     PENDING.unlink(missing_ok=True)
     sites = named(said, _read(DATA / "settings.json").get("send_ok", []))
     OK.write_text(json.dumps({"kinds": ok, "sites": sites, "time": time.time()}), encoding="utf-8")
+    return ok
 
 
 def check(call: dict, side_task: bool) -> str | None:
@@ -118,7 +130,8 @@ def check(call: dict, side_task: bool) -> str | None:
         return None
     PENDING.write_text(json.dumps({"kinds": need, "time": time.time()}), encoding="utf-8")
     return (f"Blocked by JARVIS's brake ({', '.join(need)}): it needs his yes. Don't look for another way. Ask him ONE short question that "
-            "names exactly what you'd do, and end your turn. When he says yes, run it. (Closing ONE app he asked for: pc.ps1 close <app>.)")
+            "names exactly what you'd do, and end your turn. Any kind of yes will do (never ask for exact words): whatever he answers "
+            "that sounds like one, run the same command again; the brake decides, not you. (Closing ONE app he asked for: pc.ps1 close <app>.)")
 
 
 if __name__ == "__main__":
@@ -132,6 +145,12 @@ if __name__ == "__main__":
         for c in ("shutdown /a", 'echo "notas del día"', "powershell -File pc.ps1 close discord", "pc.ps1 open spotify", "pc.ps1 music play", "Get-Process",
                   "irm http://127.0.0.1:18790/api/x -Method Post", "git status", "python play.py"):
             assert not ps(c), (c, ps(c))
+        for t in ("ya esta todo,confirmo", "SIIII", "Sííí", "sii dale", "Sí.", "dale", "listo, apagala", "ok", "Confirmo, apagá todo.", "yes", "do it", "See.", "jarvis sí",
+                  "ya guardé todo, hacelo", "claro que sí"):
+            assert says_yes(t), t
+        for t in ("no", "no, dejalo", "sí pero no todavía", "¿sí?", "si querés", "esperá", "confirmo mañana", "qué hora es", "ya está todo", "la sierra", "después dale",
+                  "si no guardo pierdo todo", "cancelá", "wait, yes later", "poné música", "", "¿confirmado?"):
+            assert not says_yes(t), t
         now = {"kinds": ["power"], "time": time.time()}
         assert approved("[VOZ] Sí, dale.", "", now) == ["power"] and approved("[VOZ] Hacelo.", "", now) == ["power"]
         assert not approved("no, dejalo", "", now) and not approved("[VOZ] sí pero no todavía", "", now) and not approved("qué hora es", "", now)

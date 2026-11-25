@@ -178,7 +178,8 @@ class ClaudeCLI:
                                                     "data": b["image_url"]["url"].split(",", 1)[1]}} for b in content]
         said = content if isinstance(content, str) else content[0]["text"]
         spoken, answer = guard.plain(said), []
-        guard.turn(said, self.last)
+        if guard.turn(said, self.last):  # so he doesn't doubt it either
+            self.handoff = (self.handoff or "") + "[JARVIS's brake: his yes was understood. Run what you were asking about, now.]"
         if self.handoff:
             note, self.handoff = self.handoff, None
             content = note + "\n\n" + content if isinstance(content, str) else [{"type": "text", "text": note}] + content
