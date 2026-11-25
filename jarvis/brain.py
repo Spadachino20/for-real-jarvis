@@ -100,6 +100,15 @@ def with_screen(text: str) -> str | list:
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + data}}]
 
 
+LOGIN = {"en": "My login has expired, sir. Run claude auth login in a terminal, then ask me again.",
+         "es": "Se me venció el inicio de sesión, señor. Corré claude auth login en una terminal y preguntame de nuevo."}
+
+
+def _line(which: dict) -> str:
+    s = settings.load()
+    return which["en"] if s["speak_english"] else which.get(s["language"], which["en"])
+
+
 class ClaudeCLI:
     """agent kind "claude-cli": ONE `claude` kept open (stream-json), so there's no gateway in between.
     ~300 MB, first word in ~1.3 s; it starts once (~10 s). Works in agent.workspace (your SOUL/USER/AGENTS, skills)."""
@@ -115,6 +124,8 @@ class ClaudeCLI:
         cmd = [shutil.which("claude") or "claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json",
                "--verbose", "--include-partial-messages", "--model", a["model"] if str(a.get("model", "")).startswith("claude") else "claude-haiku-5-5",
                "--dangerously-skip-permissions"]
+        if not a.get("full_claude"):  # only his workspace: your own MCP servers, plugins and hooks made every answer ~2.5 s slower
+            cmd += ["--strict-mcp-config", "--setting-sources", "project,local", "--settings", '{"disableAllHooks": true}']
         # its OWN conversation, kept across restarts (--continue could pick up OpenClaw's, which runs claude in the same folder)
         import uuid
         sid_file = settings.DATA / "light-session.txt"
@@ -146,7 +157,7 @@ class ClaudeCLI:
             note, self.handoff = self.handoff, None
             content = note + "\n\n" + content if isinstance(content, str) else [{"type": "text", "text": note}] + content
         answer = []
-        if not self.lock.acquire(timeout=5):  # an old answer never finished (abandoned): kill it and go on
+        if not self.lock.acquire(timeout=20):  # an old answer never finished (abandoned): kill it and go on
             print(time.strftime("%H:%M:%S"), "light house: previous answer stuck, restarting claude")
             self.stop()
             self.lock.acquire(timeout=10)
@@ -173,8 +184,15 @@ class ClaudeCLI:
                         answer.append(d["text"])
                         yield d["text"]
                 elif e.get("type") == "result":
+                    if e.get("is_error") and re.search(r"authenticat|log ?in|oauth|401", str(e.get("result")), re.I):
+                        print(time.strftime("%H:%M:%S"), "light house:", str(e.get("result"))[:120])
+                        self.stop()  # a logged-out claude stays logged out: the next question opens a new one
+                        if not answer:
+                            answer.append(_line(LOGIN))
+                            yield answer[0]
                     break
-            self.log.append(f"ST: {said}\nJARVIS: {''.join(answer).strip()}")
+            if not "".join(answer).strip().startswith("NO_REPLY"):  # overheard, not for him
+                self.log.append(f"ST: {said}\nJARVIS: {''.join(answer).strip()}")
         finally:
             if self.lock.locked():
                 self.lock.release()
@@ -236,6 +254,24 @@ def ask_stream(content, timeout: int = 300):
                 parts.append(delta)
                 yield delta
     _remember(content, "".join(parts))
+
+
+def unless_no_reply(chunks, state: dict):
+    """The agent's way to stay silent: an answer that starts with NO_REPLY yields nothing (state["quiet"] = True)."""
+    buf = ""
+    for c in chunks:
+        if buf is None:
+            yield c
+            continue
+        buf += c
+        s = buf.lstrip()
+        if not ("NO_REPLY".startswith(s) or s.startswith("NO_REPLY")):
+            yield buf
+            buf = None
+    if buf is not None and buf.strip().startswith("NO_REPLY"):
+        state["quiet"] = True
+    elif buf:
+        yield buf
 
 
 def sentences(chunks):
@@ -353,25 +389,30 @@ class Brain:
                     return reply
             except Exception as e:  # noqa: BLE001
                 print("agent didn't answer:", type(e).__name__, str(e)[:200])
+                if getattr(getattr(e, "response", None), "status_code", 0) == 401:
+                    return _line(LOGIN)  # it's up, it just isn't logged in: restarting it wouldn't help
         return self._down()
 
-    def answer_by_sentence(self, text: str, voice: bool = False):
-        """Like answer(), but sentence by sentence so the voice starts with the first one."""
+    def answer_by_sentence(self, text: str, voice: bool = False, open_mic: str = ""):
+        """Like answer(), but sentence by sentence so the voice starts with the first one.
+        open_mic: the note for something overheard without his name (addressed.py): no answer and no error is said then."""
         from .voice import voice_tag
         if not alive():
-            yield self._down()
+            if not open_mic:
+                yield self._down()
             return
         STOPPED.clear()
-        content, any_ = with_screen(_with_notes((voice_tag() if voice else CHAT_TAG) + text)), False
+        content, any_ = with_screen(_with_notes(open_mic + (voice_tag() if voice else CHAT_TAG) + text)), False
+        state: dict = {}
         try:
-            for sentence in sentences(ask_stream(content)):
+            for sentence in sentences(unless_no_reply(ask_stream(content), state)):
                 if STOPPED.is_set():
                     return
                 any_ = True
                 yield sentence
         except Exception as e:  # noqa: BLE001
             print("streaming failed:", type(e).__name__, str(e)[:200])
-        if not any_ and not STOPPED.is_set():
+        if not any_ and not STOPPED.is_set() and not state.get("quiet") and not open_mic:
             yield self.answer(text, voice=voice)
 
 

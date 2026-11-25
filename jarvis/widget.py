@@ -226,7 +226,8 @@ class Orb:
     def _animate(self) -> None:
         """Drawn with PIL at 2x and scaled down: smooth rings and a glowing core (tk's canvas can't antialias)."""
         color = self.colors.get(self.state, self.colors["idle"])
-        self.phase += 0.12
+        wait = 40 if self.state in ("listening", "speaking", "thinking") else 125  # at rest it only breathes: 8 fps
+        self.phase += 0.12 * wait / 40
         try:  # "I'm looking at your screen": two bright white flashes for 1.5 s after every capture
             looked = time.time() - SCREEN.stat().st_mtime
         except OSError:
@@ -243,7 +244,7 @@ class Orb:
         breath = 0.5 + 0.5 * math.sin(self.phase * (1.2 if alive else 0.35))  # slow pulse of the core's light
         arc = (self.phase * 90) % 360 if self.state == "thinking" else None
         _layered(self.hwnd, _frame(color, self.letter, radii, breath, arc), self.canvas.winfo_rootx(), self.canvas.winfo_rooty())
-        self.root.after(40, self._animate)
+        self.root.after(40 if looked < 1.5 else wait, self._animate)
 
     def _press(self, e) -> None:
         self._origin, self._moved = (e.x_root, e.y_root, self.root.winfo_x(), self.root.winfo_y()), False

@@ -33,15 +33,20 @@ function MediaState($s) {
     "$app ${st}: $($p.Artist) - $($p.Title)"
 }
 
+function Ours {
+    # process ids never to close: our own parents (the agent may be a CLI named like the app, e.g. claude) and
+    # what the orb's python started (JARVIS's light-house `claude`)
+    $parent = @{}; $py = @()
+    Get-CimInstance Win32_Process | % { $parent[[int]$_.ProcessId] = [int]$_.ParentProcessId; if ($_.Name -like 'python*') { $py += [int]$_.ProcessId } }
+    $mine = @(); $id = $PID
+    while ($id -and $mine -notcontains $id) { $mine += $id; $id = $parent[$id] }
+    $mine + @($parent.Keys | ? { $py -contains $parent[$_] })
+}
+
 function CloseThese([string[]]$names, [datetime]$since = [datetime]::MinValue) {
     # closes the processes a mode lists. Steam exits cleanly through its URL: killing it makes it relaunch.
-    # never our own parents: the agent may run on a CLI with the same name (e.g. claude); killing it kills this mode
-    $mine = @(); $id = $PID
-    while ($id -and $mine -notcontains $id) { $mine += $id; $id = (Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue).ParentProcessId }
-    # nor JARVIS's own light-house `claude` (its parent is the orb's python)
-    $orb = @(Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue | % ProcessId)
-    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since -and $mine -notcontains $_.Id -and
-        $orb -notcontains (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction SilentlyContinue).ParentProcessId })
+    $ours = Ours
+    $p = @(Get-Process $names -ErrorAction SilentlyContinue | ? { $_.StartTime -gt $since -and $ours -notcontains $_.Id })
     if (-not $p) { return }
     if ($p | ? ProcessName -eq steam) { Start-Process "steam://exit" }
     $p | ? ProcessName -notmatch '^steam' | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -82,7 +87,10 @@ function OpenThing([string]$target) {
         $name, $what = $app.Name, "shell:AppsFolder\$($app.AppID)"
     }
     $short = ($name -split '\s')[0]
-    if (Get-Process "*$short*" -ErrorAction SilentlyContinue | ? MainWindowHandle -ne 0) { return "$name was already open" }
+    if (Get-Process "*$short*" -ErrorAction SilentlyContinue | ? MainWindowHandle -ne 0) {
+        if ($what -like "shell:*") { Launch $what }   # brings it to the front (a Start menu app)
+        return "$name was already open"
+    }
     $t0 = (Get-Date).AddSeconds(-1)
     Launch $what
     if ($running = Settled $short $t0) { return "$name opened (running: $running)" }
@@ -214,7 +222,8 @@ switch ($Action.ToLower()) {
         OpenThing $Arg
     }
     "close" {
-        $ps = Get-Process | ? { $_.ProcessName -like "*$Arg*" -or ($_.MainWindowTitle -and $_.Product -like "*$Arg*") }
+        $ours = Ours
+        $ps = Get-Process | ? { $ours -notcontains $_.Id } | ? { $_.ProcessName -like "*$Arg*" -or ($_.MainWindowTitle -and $_.Product -like "*$Arg*") }
         if (-not $ps) { "No open program called '$Arg'."; break }
         $ps | % { $null = $_.CloseMainWindow() }; Start-Sleep 2
         $ps | ? { -not $_.HasExited } | Stop-Process -Force -ErrorAction SilentlyContinue

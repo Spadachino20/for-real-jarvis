@@ -115,11 +115,12 @@ def app(with_voice: bool) -> None:
             while parts["brain"] is None:
                 time.sleep(0.3)
             t0 = time.time()
-            from .panel import show_reply, background_reply, message_reply, metrics_reply, mode_reply, remember, where_reply
+            from .house import move_reply
+            from .panel import show_reply, background_reply, message_reply, metrics_reply, mode_reply, open_reply, remember, where_reply
             spoken = "en" if voice and settings.load()["speak_english"] else lang  # local replies in the language he speaks
             if not (reply := where_reply(text, spoken)):
                 remember(text)
-            if reply or (reply := quick_reply(text, spoken) or mode_reply(text, spoken) or metrics_reply(text, spoken) or message_reply(text, spoken) or show_reply(text, spoken, said) or background_reply(text, spoken, finished)):  # modes run here, not through the agent: instant and reliable
+            if reply or (reply := quick_reply(text, spoken) or move_reply(text, spoken) or mode_reply(text, spoken) or open_reply(text, spoken) or metrics_reply(text, spoken) or message_reply(text, spoken) or show_reply(text, spoken, said) or background_reply(text, spoken, finished)):  # modes run here, not through the agent: instant and reliable
                 orb.show("JARVIS", reply)
                 if voice and parts["ears"]:
                     parts["ears"].speak(reply)
@@ -148,6 +149,9 @@ def app(with_voice: bool) -> None:
                         rest.append(sentence)
                         yield sentence
 
+                if not first:  # the agent had nothing to say (NO_REPLY)
+                    orb.set_state("idle")
+                    return
                 parts["ears"].speak(first, then=the_rest())
                 orb.show("JARVIS", " ".join([first, *rest]).strip())
             else:
@@ -237,7 +241,58 @@ def app(with_voice: bool) -> None:
             if _pending:
                 threading.Thread(target=think, args=("sí", True), daemon=True).start()
 
-    def heard(text: str) -> None:
+    def overheard(text: str, note: str) -> None:
+        """Open mic, without his name: nothing is shown or said unless the agent takes it as his."""
+        if parts["brain"] is None or not turn.acquire(blocking=False):
+            return  # busy with something you did ask him
+        try:
+            t0, rest = time.time(), []
+            from .addressed import ORDER
+            from .panel import open_reply
+            if note == ORDER:  # an order without his name: the same beep as "Jarvis", before doing anything
+                parts["doing"] = text
+                orb.set_state("thinking")
+                orb.show(you, text)
+                from .voice import beep
+                threading.Thread(target=beep, daemon=True).start()
+            if note == ORDER and (reply := open_reply(text, "en" if settings.load()["speak_english"] else lang)):
+                orb.show("JARVIS", reply)
+                parts["ears"].speak(reply)
+                return
+            pieces, got = parts["brain"].answer_by_sentence(text, voice=True, open_mic=note), threading.Event()
+            if note == ORDER:
+                def slow() -> None:
+                    if not got.wait(2.5):
+                        parts["ears"].filler()
+                threading.Thread(target=slow, daemon=True).start()
+            first = next(pieces, "")
+            got.set()
+            if not first:
+                orb.set_state("idle")
+                print(time.strftime("%H:%M:%S"), f"open mic: not for him ({time.time() - t0:.1f}s)")
+                parts["ears"]._talk_until = 0.0  # you moved on: no more guessing until you talk to him again
+                return
+            t1 = time.time()
+            if note != ORDER:
+                orb.show(you, text)
+
+            def the_rest():
+                for sentence in pieces:
+                    rest.append(sentence)
+                    yield sentence
+
+            parts["ears"].speak(first, then=the_rest())
+            orb.show("JARVIS", " ".join([first, *rest]).strip())
+            print(time.strftime("%H:%M:%S"), f"timings voice: understand {parts['ears'].last_transcription:.1f}s | agent {t1 - t0:.1f}s | speak {time.time() - t1:.1f}s")
+        finally:
+            parts["doing"] = ""
+            turn.release()
+
+    def heard(text: str, note: str = "") -> None:
+        if note:
+            return overheard(text, note)
+        if turn.locked() and re.sub(r"\W", "", text).lower() == re.sub(r"\W", "", parts.get("doing") or "").lower():
+            return  # the order you just gave without his name, repeated with it: he's already on it
         orb.show(you, text)
         think(text, voice=True)
 
@@ -281,6 +336,9 @@ def app(with_voice: bool) -> None:
     orb.panel_url = start_panel(orb_info)
 
     def boot() -> None:
+        from . import house
+        house.announce = said
+        house.start()  # settings start_house "light": no OpenClaw needed when the PC turns on
         parts["brain"] = Brain()
         if with_voice:
             from .voice import Ears, hotkey_listener

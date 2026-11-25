@@ -71,6 +71,36 @@ def _ps(*args: str, timeout: int = 20) -> str:
     return r.stdout.strip()
 
 
+# "Abre Spotify", and how the ears mishear it ("Al Spotify", "Habré Spotify"). One app and nothing else: anything longer is the agent's
+_OPEN = re.compile(r"^\W*(?:(?:por favor|please|quiero que|pod[eé]s|puedes|can you)\W+)*(abr[a-zéí]{0,3}|[aá]breme|habr[a-zéí]{0,3}|abra|al|"
+                   r"ejecuta|ejecut[aá]|inicia|lanza|open|launch)\s+(?:el |la |mi |the |my )?([\w.+&' -]{2,28}?)(?:\W+(?:por favor|please|se[nñ]or))?\W*$", re.I)
+
+
+def open_reply(text: str, lang: str = "en") -> str | None:
+    """Opens an app right here (~2 s, checked), without asking the agent. None: not that, or no such app on this PC."""
+    m = _OPEN.match(text)
+    if not m or re.search(r"\b(?:y|and|c[aá]mara|camera)\b", m.group(2), re.I) or len(m.group(2).split()) > 3:
+        return None
+    from .addressed import _PC
+    app = m.group(2).strip()
+    if re.match(r"(?:al|hab|abril)", m.group(1), re.I) and not re.fullmatch(_PC, app, re.I):  # misheard: only a known app
+        return None
+    if re.fullmatch(r"eso|esto|es[ao]|lo|la|otr[ao]|todo|it|this|that", app, re.I):
+        return None
+    out = _ps("open", app, timeout=40)
+    if not out or out.startswith(("no app called", "Actions:")):
+        return None
+    es, app = lang == "es", out.split(" opened")[0].split(" was already")[0].split(" did NOT")[0]
+    brain.note(f"opened an app because he asked by voice ({out[:120]})")
+    if "did NOT open" in out:
+        return f"Mandé abrir {app}, pero no quedó abierto, señor." if es else f"I tried to open {app}, sir, but it didn't stay open."
+    if "already open" in out:
+        return f"{app} ya estaba abierto, señor." if es else f"{app} was already open, sir."
+    if " opened" in out:
+        return f"{app} abierto, señor." if es else f"{app} is open, sir."
+    return "Ya se lo abro, señor." if es else "Opening it, sir."
+
+
 def _when(ms: float | None, fmt: str = "%d/%m %H:%M") -> str:
     return time.strftime(fmt, time.localtime(ms / 1000)) if ms else ""
 
@@ -635,7 +665,7 @@ def status(orb: Callable[[], dict]) -> dict:
     return {"now": time.strftime("%H:%M:%S"), "agent": up, "kind": kind(), "orb": orb(),
             "main": _cached("main", 6, main_session) if up and kind() == "openclaw" else {},
             "timings": _cached("timings", 3, timings), "music": _cached("music", 8, music),
-            "pc": _cached("pc", 5, pc), "crashes": _cached("crashes", 300, crashes),
+            "pc": _cached("pc", 20, pc), "crashes": _cached("crashes", 300, crashes),
             "modes": modes(), "mode": _mode, "chat": _chat, "show": {"id": _show["id"]}, "look": look()}
 
 
@@ -733,7 +763,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                         gateway().call("sessions.reset", {"key": settings.load()["agent"]["session"]})
                         _cache.pop("chat", None)
                         return self._json({"ok": True, "error": None})
-                    reply = (mode_reply(text, lang) or show_reply(text, lang, lambda _s: None)) if text else None
+                    from .house import move_reply
+                    reply = (move_reply(text, lang) or mode_reply(text, lang) or show_reply(text, lang, lambda _s: None)) if text else None
                     error = reply if reply else (send_chat(text) if text else "Empty message.")  # the reply shows as a toast
                 elif path == "/api/control":
                     error = control(str(data.get("action", "")), str(data.get("value", "")))

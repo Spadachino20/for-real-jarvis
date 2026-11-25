@@ -29,7 +29,14 @@ class OnnxParakeet(BaseTranscriptionEngine):
         self.model = onnx_asr.load_model("nemo-parakeet-tdt-0.6b-v3", quantization="int8")
 
     def transcribe(self, audio, language=None, use_prompt=True, **kwargs) -> TranscriptionResult:
-        text = self.model.recognize(self._normalize_audio(audio), sample_rate=16000).strip() if len(audio) else ""
+        import numpy as np
+        if audio is None or not len(audio):
+            return TranscriptionResult(text="", info=TranscriptionInfo(language=language))
+        audio = np.asarray(self._normalize_audio(audio), np.float32)
+        text = self.model.recognize(audio, sample_rate=16000).strip() if len(audio) else ""
+        if not text and kwargs.get("retry", True) and len(audio) > 4800 and np.sqrt((audio ** 2).mean()) > 0.004:
+            pad = np.zeros(8000, np.float32)  # a clipped phrase comes out blank 1 in 3 times; with silence around it, rarely
+            text = self.model.recognize(np.concatenate([pad, audio, pad]), sample_rate=16000).strip()
         text = fix(text, settings.load().get("stt_fixes") or {})
         return TranscriptionResult(text=text, info=TranscriptionInfo(language=language, language_probability=1.0 if text else 0.0))
 
@@ -43,6 +50,20 @@ def engine() -> OnnxParakeet:
 def _whisper():
     from faster_whisper import WhisperModel
     return WhisperModel("base", device="cpu", compute_type="int8")
+
+
+def second_try(audio) -> str:
+    """Parakeet wrote nothing for something you did say to him: the small Whisper. "" = there really was nothing."""
+    import numpy as np
+    if audio is None or len(audio) < 4800:
+        return ""
+    audio = np.asarray(audio, np.float32)
+    if np.sqrt((audio ** 2).mean()) < settings.load().get("name_check_min_rms", 0.004):
+        return ""
+    lang = settings.load()["language"]
+    segs, _ = _whisper().transcribe(audio, beam_size=5, language=lang if lang in ("es", "en") else None,
+                                    vad_filter=True, condition_on_previous_text=False)
+    return " ".join(s.text.strip() for s in segs if s.no_speech_prob < 0.6).strip()
 
 
 def says_name(audio) -> bool:

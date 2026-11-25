@@ -5,6 +5,7 @@ Voice: Kokoro (local) or ElevenLabs (cloud, data/elevenlabs.key). Everything tha
 """
 from __future__ import annotations
 
+import collections
 import re
 import threading
 import time
@@ -13,7 +14,7 @@ from typing import Callable
 import numpy as np
 import sounddevice as sd
 
-from . import settings
+from . import addressed, settings
 
 # Orb menu voices. "a:0.6+b:0.4" mixes two Kokoro voices.
 VOICES = {
@@ -147,7 +148,7 @@ def output() -> int | None:
 
 def _play(audio, sr: int) -> None:
     with _audio_lock:
-        sd.play(audio, sr, device=output())
+        sd.play(audio, sr, device=output(), latency="low" if len(audio) < sr // 4 else None)  # a beep: ~0.1 s sooner
         t0, window = time.time(), sr // 20
         while sd.get_stream().active:  # instead of sd.wait(): feed the orb while it plays
             i = int((time.time() - t0) * sr)
@@ -185,6 +186,15 @@ class ClapDetector:
             threading.Thread(target=self.on_double, daemon=True).start()
             return True
         return False
+
+
+def _paused(audio: np.ndarray, sec: float = 0.16) -> bool:
+    """You said something and went quiet just now (the last 0.16 s far below the loudest 0.1 s)."""
+    h = 1600
+    if audio.size < 3 * h:
+        return False
+    loud = max(float(np.sqrt(np.mean(audio[i:i + h] ** 2))) for i in range(0, audio.size - h + 1, h))
+    return loud > 0.006 and float(np.sqrt(np.mean(audio[-int(16000 * sec):] ** 2))) < 0.15 * loud
 
 
 def _device() -> str:
@@ -428,8 +438,28 @@ class Ears:
         self._awake_until = 0.0
         self._last_audio = time.time()
         self.claps: ClapDetector | None = None   # set by the app: clap-clap -> work mode
+        self._load_spotter()
+        self._ring: collections.deque = collections.deque(maxlen=110)  # ~3.5 s of mic, for _hear_name
+        self._woke_rec = self._ended_rec = -1.0
+        self._talk_until, self._asked = 0.0, False  # open mic (addressed.py): he just spoke / he asked something
         self.rec = self._create()
         threading.Thread(target=self._watchdog, daemon=True).start()
+
+    def _load_spotter(self) -> None:
+        """Before the mic opens: loading it in the mic callback (cold boot: >6 s) stalled the audio, the watchdog
+        rebuilt the ears and the second import met a half-loaded openwakeword."""
+        self._oww, self._oww_buf = None, np.zeros(0, np.int16)
+        s = settings.load()
+        if s.get("stt") == "parakeet":  # loaded now: the first "Jarvis" used to wait ~2 s for Whisper
+            from . import stt
+            threading.Thread(target=lambda: stt.says_name(np.random.default_rng(0).normal(0, .02, 16000).astype(np.float32)), daemon=True).start()
+        if not s.get("fast_wake", True) or s.get("stt") == "parakeet":  # _hear_name does it, "Jarvis" alone too: ~120 MB less
+            return
+        try:
+            from openwakeword.model import Model
+            self._oww = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
+        except Exception as e:  # noqa: BLE001 — no model: the transcription still wakes him, just later
+            print("fast wake off:", type(e).__name__, str(e)[:120])
 
     def _create(self):
         from RealtimeSTT import AudioToTextRecorder
@@ -447,7 +477,7 @@ class Ears:
             initial_prompt=("Oye Jarvis, sí, dale, procedé, poné el modo trabajo, por favor. " if _lang() == "es" else "") +  # a Spanish prompt keeps Whisper in Spanish
             f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,
             silero_sensitivity=0.4, silero_backend="raw_onnx" if s.get("stt") == "parakeet" else "official_onnx",  # raw: no torch (jarvis/lean.py) silero_deactivity_detection=True,
-            webrtc_sensitivity=3, post_speech_silence_duration=s.get("silence_sec", 0.45), min_length_of_recording=0.4,
+            webrtc_sensitivity=3, post_speech_silence_duration=s.get("silence_sec", 0.45), min_length_of_recording=0.4, pre_recording_buffer_duration=0.6,  # 0.2 clipped the first syllable
             on_recording_start=self._starts, on_recording_stop=self._stops, on_recorded_chunk=self._audio,
             no_log_file=True)
 
@@ -455,6 +485,7 @@ class Ears:
         self._last_audio = time.time()
         audio = np.frombuffer(chunk, np.int16) / 32768
         _mark("mic", audio)
+        self._ring.append((self._last_audio, audio.astype(np.float32)))
         talking = getattr(self, "_rec_start", 0) > getattr(self, "_rec_end", 0) or time.time() - getattr(self, "_rec_end", 0) < 1
         if self.claps and talking:  # "p", "t", "k" in your voice peak like claps: none while you speak
             self.claps.last_clap = 0.0
@@ -468,29 +499,22 @@ class Ears:
 
     def _spot(self, pcm: np.ndarray) -> None:
         """openWakeWord hears "(hey) Jarvis" while you're still talking: beep in ~0.2 s instead of after Whisper."""
-        if not settings.load().get("fast_wake", True):
-            return
-        if not hasattr(self, "_oww"):
-            try:
-                from openwakeword.model import Model
-                self._oww, self._oww_buf = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx"), np.zeros(0, np.int16)
-            except Exception as e:  # noqa: BLE001 — no model: Whisper still wakes him, just later
-                print("fast wake off:", type(e).__name__, str(e)[:120])
-                self._oww = None
-        if self._oww is None:
+        if self._oww is None or not settings.load().get("fast_wake", True):
             return
         self._oww_buf = np.concatenate([self._oww_buf, pcm])
         while self._oww_buf.size >= 1280:  # the model eats 80 ms frames
             frame, self._oww_buf = self._oww_buf[:1280], self._oww_buf[1280:]
             score = max(self._oww.predict(frame).values())
             if score > settings.load().get("wake_threshold", 0.5) and time.time() - getattr(self, "_fast_woke", 0) > 3:
-                self._fast_woke = time.time()
+                self._fast_woke, self._woke_rec, self._woke_guess = time.time(), getattr(self, "_rec_start", 0.0), False
                 self._oww.reset()
                 threading.Thread(target=self._wake, args=(True,), daemon=True).start()
 
     def _watchdog(self) -> None:
         while self.running:
             time.sleep(2)
+            if 0 < self._awake_until < time.time() and not self.speaking:
+                self._sleep()  # you said nothing more: back to rest (the orb used to stay lit)
             if self.mic_on and time.time() - self._last_audio > self.NO_AUDIO_SEC:
                 print(time.strftime("%H:%M:%S"), "the mic stopped sending audio: rebuilding the ears")
                 old = self.rec
@@ -507,14 +531,42 @@ class Ears:
 
     def _starts(self) -> None:
         self._rec_start = time.time()
+        if (self.mic_on and not self.speaking and not self.awake() and settings.load().get("fast_wake", True)
+                and settings.load().get("stt") == "parakeet"):
+            threading.Thread(target=self._hear_name, args=(self._rec_start,), daemon=True).start()
+
+    def _hear_name(self, start: float) -> None:
+        """"Jarvis" on its own (openWakeWord only knows "hey Jarvis"): Parakeet reads along while you're still talking
+        (~0.13 s a look, first 1.8 s of each phrase, only asleep) and he beeps the moment the name is in it.
+        A short phrase it can't make out gets the hinted Whisper (stt.says_name) at the first pause, once."""
+        from . import stt
+        checked = False
+        while time.time() < start + 1.8 and self._rec_start == start and getattr(self, "_rec_end", 0) < start:
+            if self.awake() or self.speaking:
+                return
+            heard = [a for at, a in list(self._ring) if at > start - 0.5]  # the VAD opens a bit after you start
+            if heard and sum(map(len, heard)) > 6400:
+                audio = np.concatenate(heard)
+                text = stt.engine().transcribe(np.concatenate([audio, np.zeros(3200, np.float32)]), retry=False).text
+                found = split_wake(text)[0]
+                guess = False
+                if not found and not checked and len(text.split()) <= 2 and _paused(audio):
+                    checked = True
+                    found = guess = stt.says_name(audio)
+                if found and not self.awake() and not self.speaking:
+                    self._fast_woke, self._woke_rec, self._woke_guess = time.time(), start, guess
+                    print(time.strftime("%H:%M:%S"), f"name heard {time.time() - start:.2f}s into your phrase")
+                    self._wake(True)
+                    return
+            time.sleep(0.04)
 
     def _stops(self) -> None:
-        self._rec_end = time.time()
+        self._rec_end, self._ended_rec = time.time(), getattr(self, "_rec_start", 0.0)
         if self.awake():
             self.state("thinking")
 
     def _wake(self, fast: bool = False) -> None:
-        self._awake_until = time.time() + FOLLOW_UP_SEC
+        self._awake_until, self._asked = time.time() + FOLLOW_UP_SEC, False
         self.state("listening")
         if fast or time.time() - getattr(self, "_fast_woke", 0) > 4:  # the fast spotter already beeped
             beep()
@@ -569,7 +621,8 @@ class Ears:
                 self.mute(False)
             # he asked something ("¿Sigo?"): answer without the name. Otherwise back to waiting for "Jarvis"
             asked = last.strip().rstrip(" .!").endswith("?") or settings.load().get("follow_up", False)
-            self._awake_until = time.time() + FOLLOW_UP_SEC if asked else 0.0
+            self._awake_until, self._asked = time.time() + FOLLOW_UP_SEC if asked else 0.0, asked
+            self._talk_until = time.time() + addressed.TALK_SEC
             self.state("listening" if asked else "idle")
 
     def filler(self, text: str | None = None) -> None:
@@ -594,7 +647,23 @@ class Ears:
                 self.last_transcription = time.time() - getattr(self, "_rec_end", time.time())
             except Exception:  # noqa: BLE001 — the watchdog closed the old recorder
                 continue
+            if len(text) < 2 and self.awake() and not self.during_his_voice() and settings.load().get("stt") == "parakeet":
+                from . import stt  # you're talking to him and nothing came out: don't lose it
+                text = stt.second_try(getattr(self.rec, "last_transcription_bytes", None))
+                print(time.strftime("%H:%M:%S"), "empty transcription, second try:", repr(text[:80]))
             called, request = split_wake(text)
+            if not called and (rest := addressed.name_at_end(text)):  # "¿qué hora es, Jarvis?"
+                called, request = True, rest
+            if not called and self._woke_rec == self._ended_rec:  # he woke inside this very phrase, the full text lost the name
+                if len(text.split()) <= 2:  # a lone "Jarvis" misheard ("Dervis"): not a request
+                    called, request = True, ""
+                elif settings.load().get("stt") == "parakeet":
+                    from . import stt
+                    # a guess (hinted Whisper) is only good for a lone "Jarvis": with more words after it, it was something else
+                    if self._woke_guess or not stt.says_name(getattr(self.rec, "last_transcription_bytes", None)):
+                        print(time.strftime("%H:%M:%S"), "woke by mistake, back to sleep:", text[:60])
+                        self._sleep()
+                        continue
             if (not called and len(text.split()) <= 2 and not self.awake() and not self.during_his_voice()
                     and settings.load().get("stt") == "parakeet"):
                 from . import stt  # Parakeet can drop the name entirely (""), so this runs before the junk check
@@ -602,7 +671,23 @@ class Ears:
                     print(time.strftime("%H:%M:%S"), "name found by the second check:", repr(text))
                     called, request = True, ""
             if not called and (len(text) < 2 or is_junk(text)):
+                if not self.speaking:  # _stops showed "thinking": there's nothing to think about
+                    self.state("listening" if self.awake() else "idle")
                 continue
+            open_mic = settings.load().get("open_mic") and not called and not self.during_his_voice()
+            if open_mic and not (self.awake() and not self._asked):  # (awake after a bare "Jarvis": it's for him)
+                from .panel import _pending
+                if not (_pending and addressed.decide(text, True) == "maybe" and len(text.split()) <= 3):  # the yes/no he's waiting for
+                    verdict = addressed.decide(text, time.time() < max(self._talk_until, self._awake_until))
+                    if verdict == "no":  # someone else's: silence, and not even the words in the log
+                        print(time.strftime("%H:%M:%S"), f"overheard, not for him ({len(text.split())} words)")
+                        if self._awake_until:
+                            self._sleep()
+                        continue
+                    print(time.strftime("%H:%M:%S"), f"open mic, {'order' if verdict == 'yes' else 'maybe for him'}:", text[:80])
+                    note = addressed.ORDER if verdict == "yes" else addressed.OPEN_MIC
+                    threading.Thread(target=self.on_heard, args=(request, note), daemon=True).start()
+                    continue
             print(time.strftime("%H:%M:%S"), "heard:", text[:80])
             if self.during_his_voice():  # only "Jarvis…" or a stop phrase cut him off; the rest is his echo
                 if not (called or is_stop(text)):
@@ -620,7 +705,8 @@ class Ears:
             if called and len(request) < 2:  # just "Jarvis": wait for the request
                 self._wake()
                 continue
-            self._awake_until = time.time() + 60  # stays awake while he thinks and talks
+            # stays awake while he thinks and talks (open mic: no need, what's for him gets through anyway)
+            self._awake_until = 0.0 if settings.load().get("open_mic") else time.time() + 60
             # in another thread: the ears keep listening while he thinks and talks (so you can cut him off)
             threading.Thread(target=self.on_heard, args=(request,), daemon=True).start()
 
@@ -661,4 +747,6 @@ if __name__ == "__main__":  # self-test (no audio needed)
     assert split_wake("I talked to Jarvis yesterday", "en")[0] is False
     assert split_wake("Jarvisito", "es")[0] is False
     assert is_junk("Thanks for watching!", "en") and not is_junk("Open Spotify", "en")
-    print("voice ok; microphones:", [n for _, n in microphones()])
+    tone = 0.1 * np.sin(np.arange(8000) / 5).astype(np.float32)
+    assert _paused(np.concatenate([tone, np.zeros(3200, np.float32)])) and not _paused(tone) and not _paused(np.zeros(9000, np.float32))
+    print("voice ok; microphones:", ascii([n for _, n in microphones()]))
