@@ -78,11 +78,24 @@ def approved(said: str, last: str, pending: dict) -> list[str]:
     return [k for k, (_, asks) in KINDS.items() if "?" in last and re.search(asks, last, re.I)]  # he asked by himself
 
 
+def named(said: str, sites: list[str]) -> list[str]:
+    """The sites (settings send_ok: "moltbook.com") he names here: "post about X on Moltbook" is already his yes to post there."""
+    return [] if "[OPEN MIC - overheard" in said else [s for s in sites if re.search(rf"\b{re.escape(s.split('.')[0])}\b", plain(said), re.I)]
+
+
+def only_to(cmd: str, sites: list[str]) -> bool:
+    """Everything this command talks to is one of those sites, and it deletes nothing there."""
+    hosts = re.findall(r"https?://([^/\s\"'`?#]+)", cmd, re.I)
+    return bool(hosts) and not re.search(r"\bdelete\b", cmd, re.I) and all(
+        any(h.lower() == s or h.lower().endswith("." + s) for s in sites) for h in hosts)
+
+
 def turn(said: str, last: str) -> None:
     """brain.py: he just said this (called before the agent gets it)."""
     ok = approved(said, last, _read(PENDING))
     PENDING.unlink(missing_ok=True)
-    OK.write_text(json.dumps({"kinds": ok, "time": time.time()}), encoding="utf-8")
+    sites = named(said, _read(DATA / "settings.json").get("send_ok", []))
+    OK.write_text(json.dumps({"kinds": ok, "sites": sites, "time": time.time()}), encoding="utf-8")
 
 
 def check(call: dict, side_task: bool) -> str | None:
@@ -97,6 +110,10 @@ def check(call: dict, side_task: bool) -> str | None:
     if side_task:
         return f"Blocked ({', '.join(need)}): a background task can't do this. Leave it out and tell him it's pending his yes."
     ok = _read(OK)
+    if "send" in need and time.time() - ok.get("time", 0) < 600 and only_to(str(args.get("command", "")), ok.get("sites", [])):
+        need.remove("send")
+        if not need:
+            return None
     if time.time() - ok.get("time", 0) < 600 and set(need) <= set(ok.get("kinds", [])):
         return None
     PENDING.write_text(json.dumps({"kinds": need, "time": time.time()}), encoding="utf-8")
@@ -121,6 +138,12 @@ if __name__ == "__main__":
         assert not approved("[OPEN MIC - overheard x] sí", "", now) and not approved("sí", "", {"kinds": ["power"], "time": 0})
         assert approved("[CHAT - typed] cierralo", "¿Cierro todas las apps, señor?", {}) == ["close"] and not approved("sí", "¿Algo más?", {})
         assert check({"tool_name": "Edit", "tool_input": {"file_path": "jarvis/guard.py"}}, False) and not check({"tool_name": "Read", "tool_input": {}}, False)
+        assert named("[VOZ] publicá sobre tu memoria en Moltbook", ["moltbook.com"]) and not named("publicá algo", ["moltbook.com"])
+        assert not named("[OPEN MIC - overheard x] publicá en Moltbook", ["moltbook.com"])
+        assert only_to('irm "https://www.moltbook.com/api/v1/posts" -Method Post', ["moltbook.com"])
+        for c in ("irm https://moltbook.com.evil.net -Method Post", "irm https://www.moltbook.com/x; irm https://evil.net -Method Post",
+                  "irm https://www.moltbook.com/api/v1/posts/1 -Method Delete", "irm $u -Method Post", "irm https://user@evil.net/moltbook.com -Method Post"):
+            assert not only_to(c, ["moltbook.com"]), c
         print("guard ok")
         sys.exit()
     try:

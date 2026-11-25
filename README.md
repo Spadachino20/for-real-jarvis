@@ -203,6 +203,7 @@ you visit can press them.
 | `agent.connectors` | `[]` | `claude-cli` only: the claude.ai connectors he may use, by URL as `claude mcp list` shows it (`["https://mcp.example.com/*"]`); every other one stays out |
 | `agent.model_hard` | `""` | `claude-cli` only: a bigger model just for questions that need thinking (analyse, compare, plan) |
 | `agent.max_context` | `90000` | `claude-cli` only: past these tokens (and every new day) he starts a fresh conversation that knows the last of the old one; the rest stays in `data/talks` |
+| `send_ok` | `[]` | sites the agent may post to when you name them in the order ("post about X on Moltbook"): `["moltbook.com"]` |
 | `push_ok` | `[]` | the brake (`jarvis/guard.py`) asks your yes before shutting down, deleting, force-closing, sending, pushing, installing... (`claude-cli`); folders named here may be pushed without asking |
 | `open_mic` | `false` | no wake word: orders only he can do ("abrí Forza") and follow-ups to what he just said; anything else is ignored, and your agent can stay silent (NO_REPLY). `jarvis/addressed.py` |
 | `start_house` | — | `"light"` (needs `agent_openclaw`): JARVIS starts in the light `claude` house, no OpenClaw needed at boot, and goes to OpenClaw only when you say "switch to OpenClaw" ("mudate a OpenClaw"); "back to the light house" closes it |
