@@ -12,7 +12,9 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
 
 ## Steps
 
-1. Check: Windows 10/11, `git` available, and you are running on the same PC as the user.
+1. Check: Windows 10/11 (not inside WSL), `git` available, and you are running on the same PC as the user. **Python 3.12**, installed normally in
+   Windows: not one that belongs to another app's private folder (it won't exist when the orb starts). If it's missing, ask the user to install it.
+   Already cloned? Go to [Updating](#updating) instead.
 2. Clone it where the user wants it (default: their home folder):
    ```powershell
    git clone https://github.com/Spadachino20/for-real-jarvis.git "$HOME\for-real-jarvis"
@@ -37,18 +39,26 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
    ```
    - OpenClaw: it turns on `gateway.http.endpoints.chatCompletions` (local only, with your gateway token). OpenClaw usually applies it by itself.
    - Hermes: it turns on the API server in its `.env` (`%LOCALAPPDATA%\hermes` on native Windows, or `~/.hermes`) (`API_SERVER_ENABLED=true` plus a random
-     `API_SERVER_KEY`, which Hermes requires even on localhost; 127.0.0.1:8642). **Restart `hermes gateway`** after.
+     `API_SERVER_KEY`, which Hermes requires even on localhost; 127.0.0.1:8642). It needs a gateway restart (step 7).
 6. Reload your skills (or start a new session) so you see `jarvis-pc`, `jarvis-modes`, `jarvis-personalize`
    and `jarvis-reminders` (OpenClaw: `<workspace>/skills/`; Hermes: `<its folder>/skills/jarvis/`).
 7. Check that the orb can reach the brain: `.venv\Scripts\python.exe -m jarvis --check-agent` (from the repo folder; the installer already does it
    at the end). If it doesn't answer, the gateway needs a restart: **that cuts you off**, so tell your user first and ask them to do it
-   (OpenClaw: `openclaw gateway restart`). Don't tell them it's ready until it says it answers.
+   (OpenClaw: `openclaw gateway restart`; Hermes: close your chat, `hermes gateway stop`, then `hermes gateway run` in a window that stays open). Don't tell them it's ready until it says it answers.
 8. `-Yes` already started it. If not: `explorer.exe "$HOME\for-real-jarvis\Start JARVIS.cmd"` (through Explorer, so it doesn't close with your command). Check `data\jarvis.log` shows no errors, or run
    `.venv\Scripts\python.exe -m jarvis --selftest` from the repo folder.
 9. The first start asks you, in a side conversation, for your name and color as JSON: answer it, that's where the orb's letter comes from
    (`data\identity.json`). Check that it shows your name; if it was skipped, the `jarvis-personalize` skill writes it.
 10. Tell the user, in two or three lines: say "Hey <your name>" (or "Hey Jarvis") or press Ctrl+Shift+J; right-click the orb → Open
    panel; press **Personalize JARVIS** and **Create a mode** when they want.
+
+## Updating
+
+1. `git pull` in the folder they have it in. Local changes in the way: show them and ask, never discard them. Then read this file again.
+2. Ask them to close the orb (right click → Quit). If `.venv` isn't Python 3.12 (`.venv\Scripts\python.exe --version`), rename it to `.venv-old`.
+3. Run `install.ps1` again, like in step 5. It keeps `data\settings.json` as it is. To connect it again from zero (it talks to the wrong agent, or
+   the orb never took your name), rename `data\settings.json` and `data\identity.json` to `.bak` first, with their yes: they lose their settings.
+4. Steps 7 to 10. Changed your name, persona or model and the orb doesn't notice? The gateway keeps the old one in memory: it needs a restart too.
 
 ## How messages reach you
 
@@ -65,4 +75,7 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
 - The orb shows the wrong name or letter: delete `data\identity.json` and restart it; it asks again.
 - It talks to the wrong agent: `agent.model` (`openclaw/<agent id>`) and `agent.session` (`agent:<agent id>:main`) in `data\settings.json`.
 - To choose again who lives in the orb: rename `data\settings.json` and `data\identity.json`, and run the installer.
+- The orb appears but doesn't hear, or `jarvis.log` says `No module named ...`: `.venv\Scripts\python.exe -m pip install -r requirements.txt`.
+- "No Python at ...": `.venv` points to a Python that isn't there. Rename `.venv`, install Python 3.12, and run the installer again.
+- Nothing of this works: give your user the exact error and the last 30 lines of `data\jarvis.log`, without keys or personal data. Don't improvise.
 - Don't "fix" things by editing the user's personal files or your persona. Ask the user.
