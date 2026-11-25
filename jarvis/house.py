@@ -109,6 +109,9 @@ def to_big() -> None:
         with brain._cli.lock:  # never mid-answer
             settings.save("agent", big)
             brain._cli.stop()  # free its ~300 MB; OpenClaw takes the conversation from here
+            sid = settings.DATA / "light-session.txt"
+            if sid.exists() and sid.read_text().strip() != openclaw_cli_session():  # he started a new conversation meanwhile
+                brain.note(f"you two also talked in your light house; it's by day in {brain.TALKS} (read it if he refers to it)")
         brain._cli.log = []
         print(time.strftime("%H:%M:%S"), "house: back home (OpenClaw)")
     _tell("Ya estoy en OpenClaw, señor.", "I'm in OpenClaw now, sir.")

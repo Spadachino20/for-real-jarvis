@@ -70,11 +70,11 @@ def already_running() -> bool:
 
 
 def kill_orphans() -> None:
-    """A JARVIS that was killed leaves its Whisper workers behind (~500 MB): close those whose parent is gone."""
+    """A JARVIS that was killed leaves its Whisper workers (~500 MB) and maybe its `claude` behind: close those whose parent is gone."""
     import os
     r = subprocess.run(["powershell", "-NoProfile", "-Command",
-                        "$all = (Get-Process).Id; Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
-                        "? { $_.CommandLine -like '*spawn_main*' -and $all -notcontains $_.ParentProcessId } | % ProcessId"],
+                        "$all = (Get-Process).Id; Get-CimInstance Win32_Process -Filter \"Name like 'python%' or Name='claude.exe'\" | "
+                        "? { ($_.CommandLine -like '*spawn_main*' -or ($_.CommandLine -like '*stream-json*' -and $_.CommandLine -like '*jarvis/guard.py*')) -and $all -notcontains $_.ParentProcessId } | % ProcessId"],
                        capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
     for pid in r.stdout.split():
         os.kill(int(pid), 9)
@@ -352,15 +352,19 @@ def app(with_voice: bool) -> None:
             from .voice import warm_fillers
             threading.Thread(target=warm_fillers, daemon=True).start()  # "Right away, sir" ready in memory
 
-            def speak_first(text: str) -> None:  # JARVIS talks without being asked: only when he's free
+            def speak_first(text: str) -> bool:  # JARVIS talks without being asked: only when he's free
                 if not turn.acquire(timeout=20):  # busy answering: wait a bit, then drop it
                     print(time.strftime("%H:%M:%S"), "proactive: skipped (busy):", text[:60])
+                    return False
                 else:
                     try:
                         orb.show("JARVIS", text)
                         parts["ears"].speak(text)
                     finally:
                         turn.release()
+                    return True
+            from .reminders import watch as watch_reminders
+            threading.Thread(target=watch_reminders, args=(speak_first,), daemon=True).start()
             if settings.load().get("gestures"):  # webcam hands: python -m jarvis.hands trains them
                 from .hands import watch as watch_hands
                 threading.Thread(target=watch_hands, args=(gesture,), daemon=True).start()

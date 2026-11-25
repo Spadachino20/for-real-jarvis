@@ -15,6 +15,13 @@ A reminder must REACH the user. One that only fires inside your own session is n
 The first time, ask where they want reminders (a chat channel you're connected to: WhatsApp, Telegram,
 Discord...) and save the answer in your notes about the user, so you never ask again.
 
+## No server running (light house / claude-cli)
+
+JARVIS says it out loud himself (he waits if the user is away). No need to ask for a channel:
+
+`{{JARVIS_HOME}}\.venv\Scripts\python.exe -m jarvis.reminders add <when> "<what>" [daily|weekdays|weekly]` run in `{{JARVIS_HOME}}`
+(`<when>`: `+10m`, `+2h`, `16:30` or `2026-11-26T08:00`; `list` and `remove <id>` too). Confirm with the time it printed.
+
 ## OpenClaw
 
 Create the automation with `automations` → `add`:
