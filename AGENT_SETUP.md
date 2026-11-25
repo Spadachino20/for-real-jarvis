@@ -1,6 +1,6 @@
 # AGENT_SETUP.md — for the AI agent installing For Real J.A.R.V.I.S.
 
-You are an AI agent (OpenClaw, Hermes or similar) and your user asked you to install this repo for them.
+You are an AI agent (OpenClaw, Hermes, Claude Code or similar) and your user asked you to install this repo for them.
 It gives them a desktop orb, a voice and a control panel that talk **to you**. You stay the brain.
 
 ## Before you start: two promises to your user
@@ -17,21 +17,37 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
    ```powershell
    git clone https://github.com/Spadachino20/for-real-jarvis.git "$HOME\for-real-jarvis"
    ```
-3. Tell the user what's going to happen, in one short message: Python (3.10-3.12) and ~2 GB of speech models
+3. **Ask your user, in ONE message, and wait for the answers: who lives in the orb?**
+   - **You** (recommended): the orb takes your name, your letter and your color, and it wakes up to your name. You keep your model,
+     so there's nothing to pay or configure. If you were just created and have no name yet, ask them for one first and save it in your persona.
+   - **A separate JARVIS**: you stay where you are and JARVIS starts from zero, as a second OpenClaw agent (same model and keys as you)
+     or with Claude Code (a Claude plan). Only one orb runs at a time.
+   Then offer the extras in the same message: **Parakeet** (ears ~10x faster, +670 MB) and **open mic** (answers orders without his name;
+   what's said near the PC and may be for him goes to the model). Off by default. And: language (English or Spanish), and whether it starts with Windows.
+4. Tell the user what's going to happen, in one short message: Python 3.12 and ~2 GB of speech models
    get installed, 4 skills are added to you, and a JARVIS shortcut goes on their desktop.
-4. Run the installer. It needs answers (enable your local chat API, language, start with Windows), so either
-   run it in a terminal the user can see, or ask them those questions first and then run it with `-Yes`:
+5. Run the installer with what they answered. `-Yes` also turns on your local chat API and, for a separate JARVIS, adds the second agent
+   to your OpenClaw: **say so in that same message and only go on with their yes.** The first run downloads ~2 GB and can take 10-30 minutes:
+   run it in the background (or with a timeout of at least 45 minutes) and don't start it twice.
    ```powershell
    powershell -ExecutionPolicy Bypass -File "$HOME\for-real-jarvis\install.ps1"
+   # you stay the brain:        install.ps1 -Yes -Who agent -Lang en   (-Which openclaw|hermes if the PC has both)
+   # a separate JARVIS:         install.ps1 -Yes -Who jarvis -Brain openclaw -Lang en   (or -Brain claude)
+   # if they want them:         -Extras "parakeet,openmic"     if they don't want it with Windows:  -NoAutostart
    ```
-   - OpenClaw: it turns on `gateway.http.endpoints.chatCompletions` (local only). **Restart your gateway** after.
-   - Hermes: it turns on the API server in `~/.hermes/.env` (`API_SERVER_ENABLED=true` plus a random
+   - OpenClaw: it turns on `gateway.http.endpoints.chatCompletions` (local only, with your gateway token). OpenClaw usually applies it by itself.
+   - Hermes: it turns on the API server in its `.env` (`%LOCALAPPDATA%\hermes` on native Windows, or `~/.hermes`) (`API_SERVER_ENABLED=true` plus a random
      `API_SERVER_KEY`, which Hermes requires even on localhost; 127.0.0.1:8642). **Restart `hermes gateway`** after.
-5. Reload your skills (or start a new session) so you see `jarvis-pc`, `jarvis-modes`, `jarvis-personalize`
-   and `jarvis-reminders` (OpenClaw: `<workspace>/skills/`; Hermes: `~/.hermes/skills/jarvis/`).
-6. Start it: `"$HOME\for-real-jarvis\Start JARVIS.cmd"`. Check `data\jarvis.log` shows no errors, or run
+6. Reload your skills (or start a new session) so you see `jarvis-pc`, `jarvis-modes`, `jarvis-personalize`
+   and `jarvis-reminders` (OpenClaw: `<workspace>/skills/`; Hermes: `<its folder>/skills/jarvis/`).
+7. Check that the orb can reach the brain: `.venv\Scripts\python.exe -m jarvis --check-agent` (from the repo folder; the installer already does it
+   at the end). If it doesn't answer, the gateway needs a restart: **that cuts you off**, so tell your user first and ask them to do it
+   (OpenClaw: `openclaw gateway restart`). Don't tell them it's ready until it says it answers.
+8. `-Yes` already started it. If not: `explorer.exe "$HOME\for-real-jarvis\Start JARVIS.cmd"` (through Explorer, so it doesn't close with your command). Check `data\jarvis.log` shows no errors, or run
    `.venv\Scripts\python.exe -m jarvis --selftest` from the repo folder.
-7. Tell the user, in two or three lines: say "Hey Jarvis" or press Ctrl+Shift+J; right-click the orb → Open
+9. The first start asks you, in a side conversation, for your name and color as JSON: answer it, that's where the orb's letter comes from
+   (`data\identity.json`). Check that it shows your name; if it was skipped, the `jarvis-personalize` skill writes it.
+10. Tell the user, in two or three lines: say "Hey <your name>" (or "Hey Jarvis") or press Ctrl+Shift+J; right-click the orb → Open
    panel; press **Personalize JARVIS** and **Create a mode** when they want.
 
 ## How messages reach you
@@ -44,6 +60,9 @@ It gives them a desktop orb, a voice and a control panel that talk **to you**. Y
 
 ## If something fails
 
-- `pip` errors: make sure Python is 3.10-3.12 (`py -3.12`), then run the installer again (it's safe to repeat).
+- `pip` errors: make sure Python is 3.12 (`py -3.12`), then run the installer again (it's safe to repeat).
 - The orb says your agent isn't answering: the local chat API is off or your gateway wasn't restarted.
+- The orb shows the wrong name or letter: delete `data\identity.json` and restart it; it asks again.
+- It talks to the wrong agent: `agent.model` (`openclaw/<agent id>`) and `agent.session` (`agent:<agent id>:main`) in `data\settings.json`.
+- To choose again who lives in the orb: rename `data\settings.json` and `data\identity.json`, and run the installer.
 - Don't "fix" things by editing the user's personal files or your persona. Ask the user.

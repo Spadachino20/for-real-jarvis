@@ -426,7 +426,7 @@ def background_reply(text: str, lang: str, done: Callable[[str, str], None]) -> 
         try:
             answer = brain.ask("[BACKGROUND TASK - the user is doing something else. Start with ONE short sentence that "
                                "sums up the result (it will be read aloud), then a blank line, then the details.]\n" + text,
-                               timeout=1800, session="agent:main:background" if kind() == "openclaw" else "for-real-jarvis-background")
+                               timeout=1800, session=brain.side("background"))
             done(answer.split("\n\n")[0].strip(), answer)
         except Exception as e:  # noqa: BLE001
             done(("No pude terminar la tarea: " if es else "I couldn't finish the task: ") + type(e).__name__, str(e)[:300])

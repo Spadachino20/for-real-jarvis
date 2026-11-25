@@ -28,8 +28,8 @@ It ships as a **skeleton**: no modes, no personality, nothing about anyone. JARV
 | | |
 |---|---|
 | Windows 10 or 11 | the orb, the voice and the PC control are Windows-only |
-| An AI agent running on your PC | **OpenClaw** (recommended: the full panel works) or **Hermes Agent** |
-| Python 3.10 - 3.12 | the installer offers to install it |
+| A brain | **OpenClaw** (recommended: the full panel works), **Hermes Agent** or **Claude Code** |
+| Python 3.12 | the installer offers to install it |
 | A microphone | headphones work best (he won't hear himself) |
 
 ### Don't have an agent yet?
@@ -38,6 +38,7 @@ JARVIS needs a brain first. Create one here, then come back:
 
 - **OpenClaw** → [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw) (recommended)
 - **Hermes Agent** → [github.com/NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
+- **Claude Code** → [claude.com/claude-code](https://claude.com/claude-code): the installer makes JARVIS his own folder (`~\jarvis-agent`) and he thinks with your Claude plan
 
 ### Already have one? Your agent can install this for you
 
@@ -47,6 +48,30 @@ Just send your agent this message:
 
 It clones the repo, runs the installer and connects itself. **Your agent keeps its own personality, name,
 memory and notes.** JARVIS only changes its personality if *you* ask for it (see [Personalize](#personalize-jarvis)).
+
+### Who lives in the orb?
+
+The installer asks one thing. JARVIS is a body (orb, ears, voice, panel, hands on the PC); the brain is one of these:
+
+| | Your agent takes the orb (recommended) | A separate JARVIS |
+|---|---|---|
+| Example | Pablo, your OpenClaw agent: the orb shows a **P** and answers to "Hey Pablo" | Pablo stays on your WhatsApp; the orb is JARVIS |
+| Model | the one Pablo already uses, nothing to configure | a second OpenClaw agent (same model and keys), or Claude Code |
+| Memory | Pablo's | JARVIS's own, from zero |
+
+What works with each brain:
+
+| | OpenClaw | Hermes | Claude Code | Any OpenAI-compatible API (Ollama...) |
+|---|---|---|---|---|
+| Orb, voice, modes, opening apps, PC alerts, reminders out loud | yes | yes | yes | yes (he can't set reminders by himself) |
+| He acts on the PC (files, apps, web) | yes | yes | yes | no: he only talks |
+| Panel: tokens, automations, sessions, logs | yes | no | part | no |
+| **The brake** (asks your yes before deleting, sending...) | no: your agent's own rules | no: your agent's own rules | yes | - |
+| Daily memory and short conversations | your agent's own | your agent's own | yes | no |
+| A bigger model only for hard questions | no | no | yes | no |
+
+For the last column, after installing, set by hand in `data/settings.json`:
+`"agent": {"kind": "openai", "url": "http://127.0.0.1:11434", "model": "<model>"}`.
 
 ## Install it yourself
 
@@ -186,7 +211,7 @@ you visit can press them.
 
 | Key | Default | |
 |---|---|---|
-| `agent.kind` | `openclaw` | `openclaw`, `hermes` or `openai` (any OpenAI-compatible agent) |
+| `agent.kind` | `openclaw` | `openclaw`, `hermes`, `claude-cli` or `openai` (any OpenAI-compatible agent) |
 | `agent.url` / `agent.model` | OpenClaw's | Hermes: `http://127.0.0.1:8642` / `hermes-agent` |
 | `agent.token` | read from OpenClaw | Hermes: your `API_SERVER_KEY` (the installer creates one) |
 | `agent.restart_command` | — | a command to bring your agent back if it goes down |

@@ -53,6 +53,12 @@ _notes: list[str] = []  # what the orb did by itself since the agent's last mess
 _history: list[dict] = []  # what the panel's chat shows for non-OpenClaw agents (and the context for plain "openai" ones)
 
 
+def side(name: str) -> str:
+    """A side conversation of the same agent (warm-up, background tasks), so the main one stays free."""
+    a = _agent()
+    return ":".join(a["session"].split(":")[:2]) + ":" + name if a["kind"] == "openclaw" else "for-real-jarvis-" + name
+
+
 def note(text: str) -> None:
     _notes.append(f"{time.strftime('%H:%M')} {text}")
 
@@ -417,7 +423,7 @@ WHO = ("[SETUP - reply with ONE line of JSON and nothing else] The voice orb on 
 
 def adopt_identity(reply: str) -> dict:
     """The orb takes your agent's own name (Hermes, OpenClaw, any): writes data/identity.json once.
-    Written even when the agent has no name ({}), so it isn't asked again; delete the file to ask again."""
+    No name yet (an agent just created): nothing is written and it's asked again at the next start."""
     m = re.search(r"\{.*?\}", reply or "", re.S)
     try:
         got = json.loads(m.group(0)) if m else {}
@@ -429,6 +435,8 @@ def adopt_identity(reply: str) -> dict:
         ident = {"name": name, "letter": re.sub(r"[^A-Za-z0-9]", "", name)[0].upper()}
         if re.fullmatch(r"#[0-9a-fA-F]{6}", str(got.get("color") or "")):
             ident["color"] = got["color"]
+    if not ident:
+        return {}
     settings.IDENTITY.write_text(json.dumps(ident, ensure_ascii=False), encoding="utf-8")
     return ident
 
@@ -450,7 +458,7 @@ class Brain:
                 try:
                     first = not settings.IDENTITY.exists()  # first start: the same message asks who the agent is
                     reply = ask(WHO if first else "[WARMUP - reply only: OK]", timeout=240,
-                                session="agent:main:warmup" if _agent()["kind"] == "openclaw" else "for-real-jarvis-warmup")
+                                session=side("warmup"))
                     if first:
                         print(time.strftime("%H:%M:%S"), "identity from your agent:", adopt_identity(reply))
                     print(time.strftime("%H:%M:%S"), "agent warmed up")

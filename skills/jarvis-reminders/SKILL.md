@@ -10,17 +10,18 @@ description: >
 
 A reminder must REACH the user. One that only fires inside your own session is never seen: don't do that.
 
-## Where it arrives
+## Out loud, on this PC (the default, whatever agent you are)
 
-The first time, ask where they want reminders (a chat channel you're connected to: WhatsApp, Telegram,
-Discord...) and save the answer in your notes about the user, so you never ask again.
-
-## No server running (light house / claude-cli)
-
-JARVIS says it out loud himself (he waits if the user is away). No need to ask for a channel:
+JARVIS's orb says it itself (it waits if the user is away). No need to ask for a channel:
 
 `{{JARVIS_HOME}}\.venv\Scripts\python.exe -m jarvis.reminders add <when> "<what>" [daily|weekdays|weekly]` run in `{{JARVIS_HOME}}`
 (`<when>`: `+10m`, `+2h`, `16:30` or `2026-11-26T08:00`; `list` and `remove <id>` too). Confirm with the time it printed.
+Never a sleep or a background command.
+
+## On their phone too, if they ask for it
+
+The first time, ask where they want them (a chat channel you're connected to: WhatsApp, Telegram,
+Discord...) and save the answer in your notes about the user, so you never ask again.
 
 ## OpenClaw
 

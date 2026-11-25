@@ -1,4 +1,4 @@
-# For Real J.A.R.V.I.S. - Python 3.10-3.12 on Windows 10/11
+# For Real J.A.R.V.I.S. - Python 3.12 on Windows 10/11
 RealtimeSTT==1.1.2        # ears: Silero VAD + faster-whisper (pulls torch, ~2 GB the first time)
 kokoro-onnx==0.6.1        # local voice
 onnxruntime==1.31.1

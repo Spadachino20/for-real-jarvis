@@ -61,6 +61,26 @@ def selftest() -> None:
         print(f"{module:9}", "OK  " if r.returncode == 0 else "FAIL", (r.stdout or r.stderr).strip().splitlines()[-1:])
 
 
+def check_agent() -> int:
+    """Does the brain answer? One word, in a side conversation (install.ps1, AGENT_SETUP.md)."""
+    import re
+    from . import brain
+    a = settings.load()["agent"]
+    try:
+        if not brain.alive():
+            raise ConnectionError(f"nothing is listening at {a['url']}")
+        reply = brain.ask("[WARMUP - reply only: OK]", timeout=120, session=brain.side("warmup"))
+        if not reply.strip():
+            raise RuntimeError("it answered nothing" + (" (run `claude` once to log in)" if a["kind"] == "claude-cli" else ""))
+        if re.search(r"not logged in|/login|invalid api key|authenticat", reply, re.I):
+            raise PermissionError("it isn't logged in" + (": run `claude auth login` in a terminal" if a["kind"] == "claude-cli" else ""))
+        print("Your agent answers:", reply.strip()[:60].encode("ascii", "replace").decode())
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print("Your agent does NOT answer:", type(e).__name__, str(e)[:200])
+        return 1
+
+
 def already_running() -> bool:
     """One orb per Windows session: if autostart and a double click collide, the second one leaves."""
     import ctypes
@@ -383,6 +403,8 @@ def main() -> None:
     args = sys.argv[1:]
     if args[:1] == ["--selftest"]:
         selftest()
+    elif args[:1] == ["--check-agent"]:
+        sys.exit(check_agent())
     elif args[:1] == ["--mics"]:
         from .voice import pick_microphone
         pick_microphone()
