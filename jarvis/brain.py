@@ -125,7 +125,11 @@ class ClaudeCLI:
                "--verbose", "--include-partial-messages", "--model", a["model"] if str(a.get("model", "")).startswith("claude") else "claude-haiku-5-5",
                "--dangerously-skip-permissions"]
         if not a.get("full_claude"):  # only his workspace: your own MCP servers, plugins and hooks made every answer ~2.5 s slower
-            cmd += ["--strict-mcp-config", "--setting-sources", "project,local", "--settings", '{"disableAllHooks": true}']
+            allowed = [{"serverUrl": u} for u in a.get("connectors") or []]  # claude.ai connectors by URL (a name lets none in); none by default
+            cmd += ["--setting-sources", "project,local", "--settings",
+                    json.dumps({"disableAllHooks": True, **({"allowedMcpServers": allowed} if allowed else {})})]
+            if not allowed:
+                cmd.append("--strict-mcp-config")
         # its OWN conversation, kept across restarts (--continue could pick up OpenClaw's, which runs claude in the same folder)
         import uuid
         sid_file = settings.DATA / "light-session.txt"

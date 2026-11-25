@@ -200,6 +200,7 @@ you visit can press them.
 | `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
 | `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
 | `agent.kind: "claude-cli"` | — | no gateway: the orb keeps ONE `claude` open (~300 MB, first word ~1.3 s); set `agent.workspace` to your agent's folder (it needs a `CLAUDE.md` that loads its SOUL/USER/MEMORY) |
+| `agent.connectors` | `[]` | `claude-cli` only: the claude.ai connectors he may use, by URL as `claude mcp list` shows it (`["https://mcp.example.com/*"]`); every other one stays out |
 | `open_mic` | `false` | no wake word: orders only he can do ("abrí Forza") and follow-ups to what he just said; anything else is ignored, and your agent can stay silent (NO_REPLY). `jarvis/addressed.py` |
 | `start_house` | — | `"light"` (needs `agent_openclaw`): JARVIS starts in the light `claude` house, no OpenClaw needed at boot, and goes to OpenClaw only when you say "switch to OpenClaw" ("mudate a OpenClaw"); "back to the light house" closes it |
 | `agent_openclaw` | — | your OpenClaw agent config: then game modes move JARVIS to the light `claude` house and close OpenClaw (~1.7 GB freed), other modes bring him back, conversation included |
