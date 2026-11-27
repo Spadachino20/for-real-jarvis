@@ -191,6 +191,9 @@ back to the local voice by himself. To stop using it, pick a non-ElevenLabs voic
 | "Where were we?" | back to your last window and request |
 | "How's my PC?" | CPU, GPU and RAM in one line, instantly |
 | "Show me the most played games on Steam" | a table in the panel's Show section; he only says one line |
+| "Send me my reminders on WhatsApp" | to your own chat, complete, no confirmation (`whatsapp_me`, OpenClaw on) |
+| "Put a Christmas playlist on YouTube Music" | finds one and plays it in your installed YouTube Music app |
+| "Press play", "open my X" when the first try fails | it looks for the app or shortcut (`apps`), presses buttons by their text (`click`) and keys (`keys`) |
 | "Tell Ana I'm running late" | WhatsApp to a contact in `whatsapp_contacts`, after you say yes |
 | "Look into X in the background" / "…and let me know when you're done" | works on it in a separate session and tells you when it's ready |
 | "Stop" / "Jarvis, …" while he talks | cuts him off |
@@ -222,6 +225,7 @@ you visit can press them.
 | `hotkey` | `ctrl+shift+j` | e.g. `ctrl+shift+f9`, `pause` |
 | `interruptible` | `true` | set `false` if you use speakers instead of headphones |
 | `whatsapp_contacts` | `[]` | names JARVIS may message by voice (your agent knows their numbers); always asks first |
+| `whatsapp_me` | `""` | your own number (`"+591..."`): "send me … on WhatsApp" goes to your chat with yourself through OpenClaw (`pc.ps1 whatsapp-me`), no confirmation; anyone else still asks |
 | `alerts` / `welcome_back` | `true` | PC alerts out loud / "welcome back" after 10 min away |
 | `away_minutes` / `ram_alert` | `10` / `92` | how long counts as away / RAM % that triggers an alert |
 | `agent.kind: "claude-cli"` | — | no gateway: the orb keeps ONE `claude` open (~300 MB, first word ~1.3 s); set `agent.workspace` to your agent's folder (it needs a `CLAUDE.md` that loads its SOUL/USER/MEMORY) |

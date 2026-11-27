@@ -226,9 +226,13 @@ def tokens() -> dict:
 
 
 def automations() -> list[dict]:
-    if kind() == "claude-cli":  # they live in OpenClaw: back in the big house they run again
-        return []
-    out = []
+    from datetime import datetime
+    from . import reminders
+    out = [{"id": f"local:{r['id']}", "name": r["text"], "enabled": True, "every": r.get("repeat") or "once",  # this PC's own: the orb says them
+            "next": datetime.fromisoformat(r["at"]).strftime("%d/%m %H:%M"), "last": "", "status": "", "channel": "", "internal": False, "local": True}
+           for r in sorted(reminders.load(), key=lambda r: r["at"])]
+    if kind() == "claude-cli" or not _cached("agent", 5, brain.alive):  # OpenClaw's own live in its gateway
+        return out
     for j in gateway().call("cron.list", {"includeDisabled": True}).get("jobs", []):  # without it, paused ones vanish
         st, h = j.get("state") or {}, j.get("schedule") or {}
         every = {"every": f"every {round(h.get('everyMs', 0) / 60000)} min", "cron": f"cron {h.get('expr', '')}",
@@ -584,7 +588,21 @@ def send_chat(text: str) -> str | None:
     return None
 
 
-def automation(job_id: str, action: str) -> str | None:
+def automation(job_id: str, action: str, data: dict | None = None) -> str | None:
+    from . import reminders
+    if action == "add":  # the panel's form: same as "recordame…" by voice
+        data = data or {}
+        try:
+            out = reminders.main(["add", str(data.get("when", "")).strip(), str(data.get("text", "")).strip()[:200]] + ([data["repeat"]] if data.get("repeat") else []))
+        except ValueError:
+            return "When: 16:30, +10m, +2h or 2026-11-28T09:00."
+        _cache.pop("automations", None)
+        return None if out.startswith("Saved") else out
+    if job_id.startswith("local:"):
+        _cache.pop("automations", None)
+        return None if reminders.main(["remove", job_id[6:]]) == "Removed." else "That reminder is gone."
+    if kind() != "openclaw":
+        return "OpenClaw only."
     g = gateway()
     if action == "run":
         g.call("cron.run", {"id": job_id})
@@ -674,7 +692,7 @@ def look() -> str:
     return "|".join(str(p.stat().st_mtime_ns) if p.exists() else "-" for p in (settings.IDENTITY, HERE / "panel.html"))
 
 
-OPENCLAW_ONLY = {"/api/tokens": ("tokens", 60, tokens), "/api/automations": ("automations", 8, automations),
+OPENCLAW_ONLY = {"/api/tokens": ("tokens", 60, tokens),
                  "/api/sessions": ("sessions", 10, sessions), "/api/logs": ("logs", 4, logs)}
 ICONS = {"/static/orb-192.png": (192, False), "/static/orb-512.png": (512, False),
          "/static/orb-maskable.png": (512, True), "/static/orb.ico": (0, False), "/favicon.ico": (0, False)}
@@ -738,6 +756,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                 return self._json({k: _show[k] for k in ("id", "title", "text", "time")})
             if path == "/api/chat":
                 return self._json(_cached("chat", 2, chat) if _cached("agent", 5, brain.alive) else {"error": "agent_down"})
+            if path == "/api/automations":  # your reminders here, plus OpenClaw's scheduled tasks when it's the agent
+                return self._json(_cached("automations", 8, automations))
             if path in OPENCLAW_ONLY:
                 if kind() != "openclaw":
                     return self._json({"error": "openclaw_only"})
@@ -773,7 +793,7 @@ def start(orb: Callable[[], dict]) -> str | None:
                     task = TASKS.get(str(data.get("task", "")))
                     error = send_chat(task) if task else "Unknown task."
                 elif path == "/api/automation":
-                    error = automation(str(data.get("id", "")), str(data.get("action", ""))) if kind() == "openclaw" else "OpenClaw only."
+                    error = automation(str(data.get("id", "")), str(data.get("action", "")), data)
                 else:
                     return self._json({"error": "not found"}, 404)
             except Exception as e:  # noqa: BLE001

@@ -136,8 +136,11 @@ class ClaudeCLI:
         sid_file = settings.DATA / "light-session.txt"
         if sid_file.exists() and time.strftime("%Y%m%d", time.localtime(sid_file.stat().st_mtime)) != time.strftime("%Y%m%d"):
             self._put_away(sid_file)  # a new day, a new conversation
-        if sid_file.exists():
-            cmd += ["--resume", sid_file.read_text().strip()]
+        sid = sid_file.read_text().strip() if sid_file.exists() else ""
+        if sid and any((Path.home() / ".claude" / "projects").glob(f"*/{sid}.jsonl")):
+            cmd += ["--resume", sid]
+        elif sid:  # cut off before its first answer was saved: there's nothing to resume, so start it under that same id
+            cmd += ["--session-id", sid]
         else:
             sid = str(uuid.uuid4())
             sid_file.write_text(sid)

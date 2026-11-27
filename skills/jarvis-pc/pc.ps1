@@ -5,6 +5,11 @@
 #   open <app|folder|file|url>                  (Microsoft Store apps too, e.g. Spotify)
 #   close <app>
 #   youtube <search> / youtube-link <search>    (open the first video / only give the link)
+#   apps <word>                                 (every app and shortcut whose name has it: what you can open)
+#   click <text> [window]                       (presses a button/link/tab by its visible text, in any app)
+#   keys <SendKeys>                             (keys to the window in front: ^l, {ENTER}, %{F4}...)
+#   whatsapp-me <text>                          (to your own WhatsApp chat, through OpenClaw; "\n" = new line)
+#   ytmusic <search or link>                    (a playlist, in your YouTube Music app if it's installed)
 #   find <part of a file name>                  (Windows search index: ~1 s)
 #   screenshot                                  (saves data\screen.jpg for your image tool)
 #   pc-status / clipboard / copy <text> / type <text>
@@ -59,7 +64,7 @@ function Launch([string]$target) {
     Start-Process explorer.exe -ArgumentList "`"$target`""
 }
 
-function Settled([string]$name, [datetime]$t0) {
+function Settled([string]$name, [datetime]$t0, [string]$title = "") {
     # the honest answer: waits up to 8 s for the program to be running (and still running a second later)
     $skip = '^(explorer|conhost|powershell|pwsh|cmd|RuntimeBroker|backgroundTaskHost|dllhost|svchost|SearchHost|ApplicationFrameHost|WerFault|Update)$'
     $seen = $null
@@ -68,6 +73,7 @@ function Settled([string]$name, [datetime]$t0) {
         $new = @(Get-Process | ? { try { $_.StartTime -gt $t0 } catch { $false } } | ? ProcessName -notmatch $skip)
         $hit = @($new | ? ProcessName -like "*$name*")
         if (-not $hit) { $hit = @($new | ? MainWindowHandle -ne 0) }
+        if (-not $hit -and $title) { $hit = @(Get-Process | ? MainWindowTitle -like "*$title*") }  # a web app: its window, inside chrome/msedge
         if ($hit -and $seen) { return ($hit.ProcessName | select -Unique) -join ', ' }
         $seen = [bool]$hit
     }
@@ -87,13 +93,13 @@ function OpenThing([string]$target) {
         $name, $what = $app.Name, "shell:AppsFolder\$($app.AppID)"
     }
     $short = ($name -split '\s')[0]
-    if (Get-Process "*$short*" -ErrorAction SilentlyContinue | ? MainWindowHandle -ne 0) {
+    if ((Get-Process "*$short*" -ErrorAction SilentlyContinue | ? MainWindowHandle -ne 0) -or (Get-Process | ? MainWindowTitle -like "*$name*")) {
         if ($what -like "shell:*") { Launch $what }   # brings it to the front (a Start menu app)
         return "$name was already open"
     }
     $t0 = (Get-Date).AddSeconds(-1)
     Launch $what
-    if ($running = Settled $short $t0) { return "$name opened (running: $running)" }
+    if ($running = Settled $short $t0 $name) { return "$name opened (running: $running)" }
     "$name did NOT open: Windows got the order but no program stayed running. Don't tell him it's open."
 }
 
@@ -212,6 +218,69 @@ switch ($Action.ToLower()) {
         $title = [regex]::Unescape($m.Groups[2].Value)
         if ($Action -eq "youtube") { Start-Process $url; "Opened on YouTube: $title ($url)" } else { "$title | $url" }
     }
+    "apps" {
+        $w = "*$Arg*"
+        $start = @(Get-StartApps | ? Name -like $w | % { "app: $($_.Name)" })
+        $links = @(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs",
+                   "$HOME\Desktop", "$env:PUBLIC\Desktop" -Recurse -Include *.lnk, *.url -EA 0 | ? BaseName -like $w | % { "shortcut: $($_.FullName)" })
+        $all = $start + $links | Select-Object -Unique -First 25
+        if ($all) { $all -join "`n" } else { "Nothing called '$Arg' in the Start menu or on the desktop. Try another word, or find '$Arg'." }
+    }
+    "click" {
+        Add-Type -AssemblyName UIAutomationClient
+        $A = [Windows.Automation.AutomationElement]
+        $wins = $A::RootElement.FindAll("Children", [Windows.Automation.Condition]::TrueCondition) | ? { $_.Current.Name -and (-not $Steps -or $_.Current.Name -like "*$Steps*") }
+        $hit = $null
+        foreach ($w in $wins) {
+            $hit = $w.FindAll("Descendants", [Windows.Automation.Condition]::TrueCondition) | ? { $_.Current.Name -like "*$Arg*" -and -not $_.Current.IsOffscreen } |
+                   Sort-Object { if ($_.Current.Name -eq $Arg) { 0 } elseif ($_.Current.Name -like "$Arg*") { 1 } else { 2 } }, { $_.Current.ControlType.ProgrammaticName -notmatch 'Button|Hyperlink|TabItem|MenuItem' }, { $_.Current.Name.Length } |
+                   Select-Object -First 1  # the exact text first: "Play" must not hit "Play my playlist"
+            if ($hit) { break }
+        }
+        if (-not $hit) { "Nothing that says '$Arg' on screen$(if ($Steps) { " in '$Steps'" }). Take a screenshot and look."; break }
+        $p = $null
+        if ($hit.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$p)) { $p.Invoke() }
+        else {  # no button pattern (a web element): a real click in its middle
+            $r = $hit.Current.BoundingRectangle
+            Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, UIntPtr e);' -Name M -Namespace FrjPc
+            [FrjPc.M]::SetCursorPos([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2)); [FrjPc.M]::mouse_event(2, 0, 0, 0, [UIntPtr]::Zero); [FrjPc.M]::mouse_event(4, 0, 0, 0, [UIntPtr]::Zero)
+        }
+        "Clicked '$($hit.Current.Name)' ($($hit.Current.ControlType.ProgrammaticName -replace 'ControlType\.')) in '$($w.Current.Name)'."
+    }
+    "keys" { (New-Object -ComObject WScript.Shell).SendKeys($Arg); "Sent keys: $Arg" }
+    "whatsapp-me" {
+        # node straight away: openclaw.cmd (a batch file) drops everything after the first line break
+        $me = (Get-Content (Join-Path $Root "data\settings.json") -Raw -Encoding UTF8 | ConvertFrom-Json).whatsapp_me
+        if (-not $me) { 'Set your number first: "whatsapp_me": "+591..." in data\settings.json.'; break }
+        $js = Join-Path $env:APPDATA "npm\node_modules\openclaw\dist\index.js"
+        if (-not (Test-Path $js)) { "OpenClaw isn't installed here: no WhatsApp."; break }
+        $text = $Arg -replace '\\n', "`n"
+        $ErrorActionPreference = "Continue"  # node's deprecation warnings on stderr aren't failures
+        $out = & node $js message send --channel whatsapp --target $me -m $text 2>&1 | Out-String
+        if ($out -match 'Sent') { "Sent to your WhatsApp ($($text.Split("`n").Count) lines)." } else { "NOT sent: " + ($out.Trim() -split "`n" | Select-Object -Last 2) -join " " }
+    }
+    "ytmusic" {
+        $url = if ($Arg -match '^https?://') { $Arg -replace '://(www\.)?youtube\.com', '://music.youtube.com' } else {
+            $html = (Invoke-WebRequest "https://www.youtube.com/results?search_query=$([uri]::EscapeDataString($Arg))&sp=EgIQAw%253D%253D" -UseBasicParsing).Content
+            $m = [regex]::Match($html, '"lockupViewModel":\{"contentImage".*?"contentId":"([\w-]+)".*?"title":\{"content":"(.*?)"')
+            if (-not $m.Success) { "No playlists for '$Arg'."; break }
+            $title = [regex]::Unescape($m.Groups[2].Value)
+            "https://music.youtube.com/watch?list=$($m.Groups[1].Value)"   # watch?list= starts playing; /playlist would only show it
+        }
+        # the installed app (a Chrome/Edge web app): its Start menu shortcut, opened straight at this playlist
+        $lnk = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "YouTube Music*.lnk" -EA 0 | Select-Object -First 1
+        $sc = if ($lnk) { (New-Object -ComObject WScript.Shell).CreateShortcut($lnk.FullName) }
+        Add-Type -AssemblyName UIAutomationClient  # one window: close the app's old one, or two playlists end up playing at once
+        [Windows.Automation.AutomationElement]::RootElement.FindAll("Children", [Windows.Automation.Condition]::TrueCondition) |
+            Where-Object { $_.Current.Name -match '^YouTube Music' -or $_.Current.Name -match '\| YouTube Music$' } |
+            ForEach-Object { try { $_.GetCurrentPattern([Windows.Automation.WindowPattern]::Pattern).Close() } catch {} }
+        Start-Sleep -Milliseconds 800
+        if ($sc -and $sc.Arguments -match '--app-id=') { Start-Process $sc.TargetPath "$($sc.Arguments) --app-launch-url-for-shortcuts-menu-item=$url"; $where = "the YouTube Music app" }
+        else { Start-Process $url; $where = "the browser (no YouTube Music app installed)" }
+        Start-Sleep 6
+        $s = MediaSession
+        "Opened in $where" + $(if ($title) { ": $title" }) + " ($url). " + $(if ($s) { "music: $(MediaState $s)" } else { "Nothing reports playing yet: it may need a click on play." })
+    }
     "open" {
         $known = @{ downloads = "$HOME\Downloads"; documents = "$HOME\Documents"; desktop = "$HOME\Desktop"; pictures = "$HOME\Pictures"
             music = "$HOME\Music"; videos = "$HOME\Videos"; youtube = "https://www.youtube.com"; instagram = "https://www.instagram.com"
@@ -250,5 +319,5 @@ switch ($Action.ToLower()) {
         [Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
         $out = Join-Path $Root "data\screen.jpg"; $bmp.Save($out, [Drawing.Imaging.ImageFormat]::Jpeg); $out
     }
-    default { "Actions: music, volume, open, close, find, screenshot, youtube, youtube-link, pc-status, clipboard, copy, type, modes, mode" }
+    default { "Actions: music, volume, open, close, apps, click, keys, whatsapp-me, find, screenshot, youtube, youtube-link, ytmusic, pc-status, clipboard, copy, type, modes, mode" }
 }

@@ -64,6 +64,10 @@ def kinds(tool: str, args: dict) -> list[str]:
     got = [k for k, (does, _) in KINDS.items() if re.search(does, cmd, re.I)]
     if "send" in got and _LOCAL.search(cmd) and not re.search(r"https?://(?!127\.0\.0\.1|localhost)", cmd):
         got.remove("send")  # his own PC
+    me = re.sub(r"\D", "", str(_read(DATA / "settings.json").get("whatsapp_me", "")))
+    targets = re.findall(r"--target[\s=]+[\"']?\+?([\d\s-]+)", cmd)
+    if "send" in got and me and targets and all(re.sub(r"\D", "", x) == me for x in targets) and re.search(r"\bmessage\s+send\b", cmd):
+        got.remove("send")  # a WhatsApp to himself (settings whatsapp_me): it's what he asked for, nobody else reads it
     if "push" in got and any(f in cmd for f in _read(DATA / "settings.json").get("push_ok", [])):
         got.remove("push")  # folders he lets them push (settings push_ok)
     names = re.findall(r"pc\.ps1[\"']?\s+close\s+[\"']?([^\"';|&\n]*)", cmd, re.I)

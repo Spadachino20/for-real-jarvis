@@ -179,9 +179,7 @@
          background: radial-gradient(900px 520px at 55% -10%, color-mix(in srgb, var(--cyan) 9%, transparent), transparent 70%),
                      linear-gradient(color-mix(in srgb, var(--cyan) 4%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
                      linear-gradient(90deg, color-mix(in srgb, var(--cyan) 4%, transparent) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
-  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;  /* scanlines, barely there */
-                background: repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px); }
-  nav, aside { background: linear-gradient(180deg, rgba(4,10,16,.92), rgba(1,3,5,.96)); backdrop-filter: blur(6px); }
+  nav, aside { background: linear-gradient(180deg, #040a10, #010305); }  /* no backdrop blur: it made Chrome's GPU memory explode */
   nav { border-right-color: var(--line); }
   .brand b { font-family: var(--display); font-weight: 700; letter-spacing: .32em; color: var(--cyan);
              text-shadow: 0 0 14px color-mix(in srgb, var(--cyan) 60%, transparent); }
@@ -230,7 +228,7 @@
   .fact { border-top-color: var(--line); font-size: 12.5px; } .fact span:last-child { font-family: var(--mono); font-size: 12px; }
   .dot { border-radius: 0; transform: rotate(45deg); }
   .section.on { animation: boot .35s ease-out; }
-  @keyframes boot { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+  @keyframes boot { from { opacity: 0; transform: translateY(6px); } }
   ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--line2); } ::-webkit-scrollbar-track { background: transparent; }
   @media (prefers-reduced-motion: reduce) { .section.on { animation: none; } }
 
@@ -246,21 +244,22 @@
                      background: radial-gradient(circle, color-mix(in srgb, var(--orb) 22%, transparent), transparent 68%); transition: background .5s; }
   .reactor .orb { position: absolute; inset: 8%; width: auto; height: auto; }
   .rings { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-  .rings * { fill: none; stroke: var(--orb); transform-origin: 200px 200px; transition: stroke .5s; }
+  .rings * { fill: none; stroke: var(--orb); transition: stroke .5s; }
+  .s90, .s40, .s24 { will-change: transform; } .s90 { animation: spin 90s linear infinite; } .s40 { animation: spin 40s linear infinite reverse; }
+  .s24 { animation: spin 24s linear infinite; } .reactor:has(.alive) .s40 { animation-duration: 18s; }
   .r1 { stroke-width: 1; opacity: .25; }
-  .r2 { stroke-width: 6; opacity: .35; stroke-dasharray: 1 7; animation: spin 90s linear infinite; }
-  .r3 { stroke-width: 2; opacity: .55; stroke-dasharray: 60 14 8 14; animation: spin 40s linear infinite reverse; }
+  .r2 { stroke-width: 6; opacity: .35; stroke-dasharray: 1 7; }
+  .r3 { stroke-width: 2; opacity: .55; stroke-dasharray: 60 14 8 14; }
   .r4 { stroke-width: 1; opacity: .3; stroke-dasharray: 2 4; }
-  .r5 { stroke-width: 3; opacity: .7; stroke-linecap: round; animation: spin 24s linear infinite; } .r5.b { opacity: .35; }
-  .alive .rings .r3, .reactor:has(.alive) .r3 { animation-duration: 18s; }
+  .r5 { stroke-width: 3; opacity: .7; stroke-linecap: round; } .r5.b { opacity: .35; }
   .stage .hello { font-size: 32px; margin-top: 6px; } .stage .actions { justify-content: center; }
   .dials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .dial { position: relative; display: grid; place-items: center; aspect-ratio: 1; }
   .dial svg { position: absolute; inset: 0; transform: rotate(-90deg); }
   .dial circle { fill: none; } .dial .bg { stroke: #0b1d2b; stroke-width: 6; } .dial .tk { stroke: var(--line2); stroke-width: 1; stroke-dasharray: 1 5.15; }
   .dial .fg { stroke: var(--cyan); stroke-width: 6; stroke-dasharray: 0 264; transition: stroke-dasharray .8s, stroke .4s;
-              filter: drop-shadow(0 0 4px var(--cyan)); }
-  .dial.high .fg { stroke: var(--orange); filter: drop-shadow(0 0 4px var(--orange)); } .dial.crit .fg { stroke: var(--red); filter: drop-shadow(0 0 4px var(--red)); }
+              }
+  .dial.high .fg { stroke: var(--orange); } .dial.crit .fg { stroke: var(--red); }
   .dial b { font: 300 20px var(--mono); margin-top: -10px; } .dial span { position: absolute; bottom: 24%; font: 600 9.5px var(--display); letter-spacing: .2em; color: var(--soft); }
   .center { text-align: center; margin-top: 8px; }
   .readouts { display: grid; gap: 12px; }
@@ -313,11 +312,10 @@
         </div>
         <div class="stage">
           <div class="reactor">
-            <svg class="rings" viewBox="0 0 400 400" aria-hidden="true">
-              <circle class="r1" cx="200" cy="200" r="196"/><circle class="r2" cx="200" cy="200" r="184"/>
-              <circle class="r3" cx="200" cy="200" r="170"/><circle class="r4" cx="200" cy="200" r="158"/>
-              <path class="r5" d="M200 22 A178 178 0 0 1 378 200"/><path class="r5 b" d="M200 378 A178 178 0 0 1 22 200"/>
-            </svg>
+            <svg class="rings" viewBox="0 0 400 400" aria-hidden="true"><circle class="r1" cx="200" cy="200" r="196"/><circle class="r4" cx="200" cy="200" r="158"/></svg>
+            <svg class="rings s90" viewBox="0 0 400 400" aria-hidden="true"><circle class="r2" cx="200" cy="200" r="184"/></svg>
+            <svg class="rings s40" viewBox="0 0 400 400" aria-hidden="true"><circle class="r3" cx="200" cy="200" r="170"/></svg>
+            <svg class="rings s24" viewBox="0 0 400 400" aria-hidden="true"><path class="r5" d="M200 22 A178 178 0 0 1 378 200"/><path class="r5 b" d="M200 378 A178 178 0 0 1 22 200"/></svg>
             <div class="orb" id="bigOrb"><canvas id="holo" width="520" height="520" aria-hidden="true"></canvas></div>
           </div>
           <div class="hello" id="hello"></div>
@@ -330,7 +328,10 @@
         </div>
         <div class="col">
           <div class="card"><div class="label" data-t="music">Music</div><div id="hMusic" class="empty">—</div></div>
-          <div class="card grow"><div class="label" data-t="nextrem">Next reminders</div><div id="hReminders" class="empty">—</div></div>
+          <div class="card grow"><div class="label" data-t="nextrem">Next reminders</div><form class="quick remform"><input class="field grow" name="text" maxlength="200" required data-ph="remwhat">
+            <input class="field" name="when" required style="width:96px" data-ph="remwhen">
+            <select class="field" name="repeat"><option value="" data-t="once"></option><option value="daily" data-t="daily"></option><option value="weekdays" data-t="weekdays"></option><option value="weekly" data-t="weekly"></option></select>
+            <button class="btn main" data-t="add">Add</button></form><div id="hReminders" class="empty">—</div></div>
         </div>
         <div class="card dock"><div class="label"><span data-t="modes">Modes</span><small data-t="oneclick">one click</small></div>
           <div class="modes" id="homeModes"></div><div class="result" id="homeResult" hidden></div></div>
@@ -400,7 +401,11 @@
     <section class="section" id="automations">
       <h1 data-t="automations">Automations</h1>
       <p class="lead" data-t="autolead">Your reminders and your agent's scheduled tasks. To create one, just ask JARVIS ("remind me…").</p>
-      <div class="card" id="autoBody"><div class="empty">…</div></div>
+      <div class="card"><form class="quick remform"><input class="field grow" name="text" maxlength="200" required data-ph="remwhat">
+            <input class="field" name="when" required style="width:96px" data-ph="remwhen">
+            <select class="field" name="repeat"><option value="" data-t="once"></option><option value="daily" data-t="daily"></option><option value="weekdays" data-t="weekdays"></option><option value="weekly" data-t="weekly"></option></select>
+            <button class="btn main" data-t="add">Add</button></form></div>
+      <div class="card" id="autoBody" style="margin-top:14px"><div class="empty">…</div></div>
     </section>
 
     <section class="section" id="sessions">
@@ -482,7 +487,8 @@ const T = {
     persession: "Per session", top10: "top 10", session: "Session", messages: "Messages", errors: "Errors", permodel: "Per model",
     nomodel: "No per-model split.", name: "Name", when: "When", next: "Next", last: "Last", runnow: "Run now", pause: "Pause",
     resume: "Resume", paused: "paused", noauto: "No automations.", queued: "Queued.", pausedok: "Paused.", resumed: "Resumed.",
-    runconfirm: "Run this automation now?", noreminders: "None pending. Say \"remind me…\".", lastact: "Last activity",
+    runconfirm: "Run this automation now?", remwhat: "Remind me to…", remwhen: "16:30 or +10m", once: "once", daily: "every day",
+    weekdays: "weekdays", weekly: "every week", remove: "Remove", removed: "Removed.", remsaved: "Reminder saved: JARVIS will say it.", noreminders: "None pending. Say \"remind me…\".", lastact: "Last activity",
     since: "How the machine is doing. On since", bluescreens: "blue screens", shutdowns: "hard shutdowns", hardware: "hardware errors",
     ramhint: "These codes usually point to the RAM. Next step: run MemTest86.", nothing: "Nothing playing", on: "on", muted: "muted",
     normal: "normal", empty: "Empty.", task: "Sent to JARVIS: answer him in the chat.", openagent: "Open your agent ↗",
@@ -512,7 +518,8 @@ const T = {
     cache: "Caché", cachesub: "reutilizados (casi gratis)", cost: "Costo", costsub: "los modelos por suscripción cuentan $0", perday: "Por día",
     persession: "Por sesión", top10: "las 10 que más gastan", session: "Sesión", messages: "Mensajes", errors: "Errores", permodel: "Por modelo",
     nomodel: "Sin separación por modelo.", name: "Nombre", when: "Cuándo", next: "Próxima", last: "Última", runnow: "Correr ahora", pause: "Pausar",
-    resume: "Activar", paused: "pausada", noauto: "No hay automatizaciones.", queued: "En cola.", pausedok: "Pausada.", resumed: "Activada.",
+    remwhat: "Recordame…", remwhen: "16:30 o +10m", once: "una vez", daily: "todos los días", weekdays: "días hábiles",
+    weekly: "cada semana", remove: "Borrar", removed: "Borrado.", remsaved: "Recordatorio guardado: JARVIS te lo va a decir.", resume: "Activar", paused: "pausada", noauto: "No hay automatizaciones.", queued: "En cola.", pausedok: "Pausada.", resumed: "Activada.",
     runconfirm: "¿Correr esta automatización ahora?", noreminders: "Ninguno pendiente. Decile \"recordame…\".", lastact: "Última actividad",
     since: "Cómo está la máquina ahora. Prendida desde el", bluescreens: "pantallazos", shutdowns: "apagones bruscos", hardware: "errores de hardware",
     ramhint: "Estos códigos suelen apuntar a la RAM. Próximo paso: pasar MemTest86.", nothing: "Nada sonando", on: "prendido", muted: "silenciado",
@@ -749,14 +756,14 @@ async function loadAuto() {
   $("autoBody").innerHTML = a.length ? `<table><thead><tr><th>${t("name")}</th><th>${t("when")}</th><th>${t("next")}</th><th>${t("last")}</th><th></th></tr></thead><tbody>
     ${a.map(x => `<tr><td>${esc(x.name)} ${x.internal ? '<span class="tag">OpenClaw</span>' : ""}${x.channel ? ` <span class="tag green">${esc(x.channel)}</span>` : ""}${x.enabled ? "" : ` <span class="tag orange">${t("paused")}</span>`}</td>
       <td class="sub">${esc(x.every)}</td><td class="n">${esc(x.next) || "—"}</td><td class="sub">${esc(x.last) || "—"} ${x.status ? `<span class="tag ${x.status === "ok" ? "green" : x.status === "error" ? "red" : ""}">${esc(x.status)}</span>` : ""}</td>
-      <td style="text-align:right;white-space:nowrap"><button class="btn small" data-auto="${esc(x.id)}" data-act="run">${t("runnow")}</button>
-        <button class="btn small" data-auto="${esc(x.id)}" data-act="${x.enabled ? "pause" : "resume"}">${x.enabled ? t("pause") : t("resume")}</button></td></tr>`).join("")}</tbody></table>`
+      <td style="text-align:right;white-space:nowrap">${x.local ? `<button class="btn small" data-auto="${esc(x.id)}" data-act="delete">${t("remove")}</button>` : `<button class="btn small" data-auto="${esc(x.id)}" data-act="run">${t("runnow")}</button>
+        <button class="btn small" data-auto="${esc(x.id)}" data-act="${x.enabled ? "pause" : "resume"}">${x.enabled ? t("pause") : t("resume")}</button>`}</td></tr>`).join("")}</tbody></table>`
     : `<div class="empty">${t("noauto")}</div>`;
   $("autoBody").querySelectorAll("[data-auto]").forEach(b => b.addEventListener("click", async () => {
     const action = b.dataset.act;
     if (action === "run" && !confirm(t("runconfirm"))) return;
     b.disabled = true;
-    if ((await post("/api/automation", {id: b.dataset.auto, action})).ok) toast(t(action === "run" ? "queued" : action === "pause" ? "pausedok" : "resumed"));
+    if ((await post("/api/automation", {id: b.dataset.auto, action})).ok) toast(t(action === "run" ? "queued" : action === "pause" ? "pausedok" : action === "delete" ? "removed" : "resumed"));
     setTimeout(() => loadAuto().catch(() => {}), 800);
   }));
 }
@@ -851,11 +858,15 @@ try { const d = sessionStorage.getItem("draft"); if (d) { $("chatText").value = 
             sp: (rnd() < .5 ? -1 : 1) * (.2 + rnd()), a: .7 + rnd() * .3, w: [1, 1, 1, 2, 3][Math.floor(rnd() * 5)]};
   });
   const sparks = Array.from({length: 60}, () => { const p = norm([rnd() - .5, rnd() - .5, rnd() - .5]), k = .3 + rnd() * .9; return p.map((x) => x * k); });
-  let t = 0, lvl = 0;
-  function frame() {
+  let t = 0, lvl = 0, last = 0;
+  function frame(now = 0) {
+    if (document.hidden) return setTimeout(frame, 500);
+    requestAnimationFrame(frame);
+    if (now - last < 33) return;  // 30 fps: half the redraws, same look
+    last = now;
     const st = document.getElementById("bigOrb").dataset.state || "idle", alive = st === "speaking" || st === "listening";
     lvl += ((alive ? .55 + .35 * Math.sin(t * 2.2) : st === "thinking" ? .25 : 0) - lvl) * .06;
-    t += still ? 0 : .016;
+    t += still ? 0 : .033;
     const col = getComputedStyle(document.documentElement).getPropertyValue(st === "speaking" ? "--speak" : "--cyan").trim() || "#38e1ff";
     const R = W * .3 * (1 + .08 * lvl), ay = t * .35, tx = .38 + .1 * Math.sin(t * .2), cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(tx), sx = Math.sin(tx);
     const view = (p) => { const x = p[0] * cy + p[2] * sy, z0 = -p[0] * sy + p[2] * cy; return [C + R * x, C + R * (p[1] * cx - z0 * sx), Math.min(1, Math.max(0, ((p[1] * sx + z0 * cx) / 1.2 + 1) / 2))]; };
@@ -863,7 +874,7 @@ try { const d = sessionStorage.getItem("draft"); if (d) { $("chatText").value = 
     const core = g.createRadialGradient(C, C, 0, C, C, R * (.45 + .15 * lvl));
     core.addColorStop(0, col); core.addColorStop(.35, col + "66"); core.addColorStop(1, col + "00");
     g.globalCompositeOperation = "lighter"; g.fillStyle = core; g.beginPath(); g.arc(C, C, R * (.45 + .15 * lvl), 0, 7); g.fill();
-    g.strokeStyle = col; g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 6; g.lineCap = "round";
+    g.strokeStyle = col; g.fillStyle = col; g.lineCap = "round";  // glow from a wide faint stroke under each line: shadowBlur ate GBs of GPU memory
     for (const a of arcs) {
       const grow = a.r * (1 + lvl * .12 * Math.sin(a.s * 5 + t * 1.5));
       let d = 0; g.beginPath();
@@ -872,13 +883,14 @@ try { const d = sessionStorage.getItem("draft"); if (d) { $("chatText").value = 
         const [x, y, z] = view([0, 1, 2].map((j) => grow * (cs * a.u[j] + sn * a.v[j])));
         k ? g.lineTo(x, y) : g.moveTo(x, y); d += z;
       }
-      g.globalAlpha = a.a * (.08 + .92 * Math.pow(d / 15, 1.3)); g.lineWidth = a.w * 1.2; g.stroke();
+      const alpha = a.a * (.08 + .92 * Math.pow(d / 15, 1.3));
+      g.globalAlpha = alpha * .18; g.lineWidth = a.w * 1.2 + 6; g.stroke();
+      g.globalAlpha = alpha; g.lineWidth = a.w * 1.2; g.stroke();
     }
     for (const p of sparks) { const [x, y, z] = view(p.map((v) => v * (1 + lvl * .2))); g.globalAlpha = .2 + .8 * z; g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4); }
-    g.globalAlpha = 1; g.shadowBlur = 0; g.globalCompositeOperation = "source-over";
-    if (!document.hidden) requestAnimationFrame(frame); else setTimeout(frame, 500);
+    g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
   }
-  frame();
+  requestAnimationFrame(frame);
 })();
 
 // ---- Home dials: CPU, RAM and C: as rings, filled from the same status the rest of the panel reads
@@ -895,6 +907,18 @@ drawStatus = function (d) {
   dial("dCpu", p.cpu); dial("dRam", p.ram_pct); dial("dDisk", disk.pct, disk.letter);
   $("hNow").textContent = d.now || "";
 };
+
+// ---- reminders from the panel: the same as saying "recordame…"
+document.querySelectorAll(".remform").forEach((f) => {
+  f.querySelectorAll("[data-ph]").forEach((i) => (i.placeholder = t(i.dataset.ph)));
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(f));
+    const r = await post("/api/automation", {action: "add", ...d});
+    if (r.ok) { toast(t("remsaved")); f.reset(); } else toast(r.error || "—");
+    loadAuto().catch(() => {});
+  });
+});
 </script>
 </body>
 </html>

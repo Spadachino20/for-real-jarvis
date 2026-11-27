@@ -62,6 +62,22 @@ def _stop_re(lang: str):
     return re.compile(rf"^\W*{w['stop']}(?:\W+{w['filler']}){{0,2}}\W*$", re.I)
 
 
+def _words(text: str) -> list[str]:
+    import unicodedata
+    plain = unicodedata.normalize("NFKD", text.lower()).encode("ascii", "ignore").decode()
+    return re.findall(r"[a-z0-9']+", plain)
+
+
+def echo_of(heard: str, said: list[str]) -> bool:
+    """Is what the mic heard just his own voice coming back (headset leaking, speakers)? Most of its words are in
+    what he said these last seconds. Your "para, Jarvis" or "abrí Chrome" over him has words he didn't say."""
+    words = [w for w in _words(heard) if w not in ("jarvis", "sir", "senor")]
+    if not words:
+        return bool(_words(heard))  # only "sir" / "señor": his
+    his = set(_words(" ".join(said)))
+    return sum(w in his for w in words) >= max(1, round(0.6 * len(words)))
+
+
 def split_wake(text: str, lang: str | None = None) -> tuple[bool, str]:
     """("Hey Jarvis, what time is it?") -> (True, "what time is it?")."""
     m = _wake_re(lang or _lang()).match(text.strip())
@@ -545,9 +561,17 @@ class Ears:
         """barge_in (headphones: he can't hear himself): you start talking over him and he goes quiet at once,
         then takes what you said as a new request. 0.6 s of voice first, so a cough doesn't cut him."""
         time.sleep(0.6)
-        if self.speaking and self._rec_start == start and getattr(self, "_rec_end", 0) < start:
-            print(time.strftime("%H:%M:%S"), "cut off by your voice")
-            self.on_barge()
+        if not (self.speaking and self._rec_start == start and getattr(self, "_rec_end", 0) < start):
+            return
+        if settings.load().get("stt") != "parakeet":
+            return  # no fast reader to tell you from his echo: the finished phrase decides (echo_of)
+        from . import stt
+        heard = [a for at, a in list(self._ring) if at > start - 0.3]
+        text = stt.engine().transcribe(np.concatenate(heard), retry=False).text if heard else ""
+        if not text.strip() or echo_of(text, [s for _, s in getattr(self, "recent", [])]):
+            return  # his own voice leaking into the mic: he keeps talking
+        print(time.strftime("%H:%M:%S"), "cut off by your voice:", text[:60])
+        self.on_barge()
 
     def _hear_name(self, start: float) -> None:
         """"Jarvis" on its own (openWakeWord only knows "hey Jarvis"): Parakeet reads along while you're still talking
@@ -618,6 +642,7 @@ class Ears:
         if not interruptible:
             self.mute(True)  # so he doesn't hear himself through the speakers
         last, self.said = text, [text]  # what he actually got to say (the fist cuts here)
+        self.recent = [(at, s) for at, s in getattr(self, "recent", []) if time.time() - at < 20] + [(time.time(), text)]  # echo check
         try:
             say(text)
             if callable(then):
@@ -627,6 +652,7 @@ class Ears:
                     break
                 if more:
                     self.said.append(more)
+                    self.recent.append((time.time(), more))
                     last = more  # the last thing said decides if he waits for an answer ("¿Sigo?")
                 say(more)
         finally:
@@ -707,6 +733,9 @@ class Ears:
                     continue
             print(time.strftime("%H:%M:%S"), "heard:", text[:80])
             if self.during_his_voice():  # only "Jarvis…" or a stop phrase cut him off; the rest is his echo
+                if echo_of(text, [s for _, s in getattr(self, "recent", [])]) and not is_stop(text):
+                    print(time.strftime("%H:%M:%S"), "his own voice came back through the mic, ignored")
+                    continue
                 if settings.load().get("barge_in"):  # headphones: it's you, not his echo
                     self.on_barge()
                     if is_stop(text):
@@ -769,6 +798,9 @@ if __name__ == "__main__":  # self-test (no audio needed)
     assert split_wake("I talked to Jarvis yesterday", "en")[0] is False
     assert split_wake("Jarvisito", "es")[0] is False
     assert is_junk("Thanks for watching!", "en") and not is_junk("Open Spotify", "en")
+    said = ["Just a second, sir.", "I can't confirm it's on screen."]  # his own voice back through the mic vs. you over him
+    assert echo_of("Just a second, sir.", said) and echo_of("I can't convert it's on screen.", said) and echo_of("sir", said)
+    assert not echo_of("Jarvis, abrí Chrome", said) and not echo_of("Perdón que te corte, abrí Chrome", said)
     tone = 0.1 * np.sin(np.arange(8000) / 5).astype(np.float32)
     assert _paused(np.concatenate([tone, np.zeros(3200, np.float32)])) and not _paused(tone) and not _paused(np.zeros(9000, np.float32))
     print("voice ok; microphones:", ascii([n for _, n in microphones()]))

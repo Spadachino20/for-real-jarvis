@@ -27,6 +27,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{{JARVIS_HOME}}\skills\jarv
 | "next" / "previous" / "what's playing?" | `music next` / `music previous` / `music status` |
 | "turn it up / down", "mute" | `volume up` / `volume down` (5 steps = 10 %; add a number for more), `volume mute` |
 | "find the file X" | `find X` → paths (Windows index, ~1 s); then `open <path>` |
+| "send me … on WhatsApp", "WhatsApp me a summary" | `whatsapp-me '<text>'` → to his own chat (needs OpenClaw on); `\n` for each new line, all the details he asked for |
+| "play X on YouTube Music", "put on a Christmas playlist in YouTube Music" | `ytmusic X` → finds a playlist and plays it in his installed YouTube Music app (never plain YouTube); a link works too |
+| "open my X" and `open` didn't find it | `apps X` → the apps and shortcuts that match; then `open` the exact name or path |
+| press a button/tab/link in an app ("dale play", "next tab") | `click 'Play' [window]`; keys: `keys '{ENTER}'`, `keys '^l'` |
 | "play X on YouTube" / "give me the link to X" | `youtube X` (opens the first video) / `youtube-link X` (title and link only) |
 | "open YouTube / Instagram / TikTok / X / Gmail / the panel" | `open youtube` (or that name) |
 | "how's my PC?", "why is it slow?" | `pc-status` → CPU, RAM, disks, top memory users, blue screens and hard shutdowns |
@@ -35,6 +39,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "{{JARVIS_HOME}}\skills\jarv
 | "type: …", "dictate: …" | `type '<text>'` → pasted where the cursor is; the clipboard is restored |
 | check something on screen | `screenshot` → then look at the image file it returns |
 | "work mode", "let's play X", any of the user's modes | `modes` to list them, `mode <id>` to run one |
+
+## Figure it out (never "I can't" after one try)
+
+Small PC things (open an app, play something, press a button) are yours to solve. When the first way fails or the
+output isn't what he asked for, try the next rung yourself, without asking him:
+
+1. The shortcut for it (`open X`, `ytmusic X`, `music play`...).
+2. `apps <word>` → every app and shortcut with that word (web apps installed from Chrome/Edge too): `open` the exact one.
+3. A link in his browser, or the app's own address (music.youtube.com, web.whatsapp.com...).
+4. Look and act: `screenshot` to see the screen, then `click '<text on it>' [window]` (buttons, tabs, links, "Play"),
+   `keys` (`^l`, `{ENTER}`, `{TAB}`) and `type` for search boxes; screenshot again to check.
+
+Only after rung 4, tell him in one line what you tried and what's blocking. When he corrects how he wants something
+done ("YouTube Music means my app"), save it to memory so the next time the first try is the right one.
 
 ## Rules
 
