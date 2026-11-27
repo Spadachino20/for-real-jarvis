@@ -13,8 +13,8 @@ from functools import lru_cache
 from typing import Callable
 
 BG, TRANSPARENT = "#0b1220", "#010203"
-COLORS = {"idle": "#2b6f8a", "listening": "#38e1ff", "thinking": "#ffb347",
-          "speaking": "#4f9dff", "loading": "#6b7280", "mic off": "#7f1d1d"}
+COLORS = {"idle": "#38e1ff", "listening": "#38e1ff", "thinking": "#ffb347",
+          "speaking": "#ff8a1f", "loading": "#6b7280", "mic off": "#7f1d1d"}
 from .settings import DATA, identity
 SCREEN = DATA / "screen.jpg"  # written on every "look at my screen"
 SIZE = 128  # canvas; with the voice the rings open up to ~63 px of radius
@@ -36,59 +36,84 @@ def _mix(color: str, other: str, amount: float) -> str:
 
 
 def palette(accent: str) -> dict:
-    """State colors from your agent's color (data/identity.json): listening = the color itself."""
-    return COLORS | {"idle": _mix(accent, BG, 0.2), "listening": accent, "speaking": _mix(accent, "#ffffff", 0.3)}
+    """State colors from your agent's color (data/identity.json): at rest and listening the color itself, speaking orange."""
+    return COLORS | {"idle": accent, "listening": _mix(accent, "#ffffff", 0.25), "thinking": _mix(accent, "#ffffff", 0.45)}
 
 
 def _rgb(color: str) -> tuple[int, int, int]:
     return tuple(int(color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
 
 
-@lru_cache(maxsize=16)
-def _core(color: str, letter: str):
-    """The still part, at 2x: dark disc, colored light from the center, the core ring and the letter."""
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont
-    S, c, accent = SIZE * 2, SIZE, _rgb(color)
-    disc = Image.new("RGBA", (S, S), (0, 0, 0, 0))  # no background: you see through the orb, only lines
-    ImageDraw.Draw(disc).ellipse((4, 4, S - 5, S - 5), fill=_rgb(BG) + (2,))  # invisible, but catches the mouse
-    inside = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(inside).ellipse((c - 42, c - 42, c + 42, c + 42), fill=255)
-    glow = Image.new("RGBA", (S, S), _rgb(BG) + (255,))  # the core: dark, with colored light from its center
-    ImageDraw.Draw(glow).ellipse((c - 34, c - 34, c + 34, c + 34), fill=accent + (255,))
-    glow = glow.filter(ImageFilter.GaussianBlur(18))
-    glow.putalpha(inside)
-    top = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    d = ImageDraw.Draw(top)
-    d.ellipse((c - 44, c - 44, c + 44, c + 44), fill=tuple(round(a * .28 + b * .72) for a, b in zip(accent, _rgb(BG))) + (255,),
-              outline=accent + (255,), width=4)
-    try:
-        font = ImageFont.truetype("C:/Windows/Fonts/seguisb.ttf", 46)
-    except OSError:
-        font = ImageFont.load_default(46)
-    d.text((c, c + 2), (letter or "J")[:1].upper(), font=font, fill=tuple(round(a * .7 + 255 * .3) for a in accent) + (255,), anchor="mm")
-    halo = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    ImageDraw.Draw(halo).text((c, c + 2), (letter or "J")[:1].upper(), font=font, fill=accent + (255,), anchor="mm")
-    top = Image.alpha_composite(halo.filter(ImageFilter.GaussianBlur(5)), top)
-    return disc, glow, top
+@lru_cache(maxsize=1)
+def _sphere():
+    """The hologram, like the films': nested shells of broken arcs at every angle, short data ticks and a few sparks.
+    Each arc: radius, two axes of its circle, where it starts, how long it is, how fast it slides, how bright."""
+    import numpy as np
+    rng = np.random.default_rng(11)
+    count = 170
+    axis = rng.normal(size=(count, 3))
+    axis[:100] = [0, 1, 0] + rng.uniform(-0.2, 0.2, size=(100, 3))  # most lie like latitudes: you see the shells
+    axis /= np.linalg.norm(axis, axis=1, keepdims=True)
+    helper = np.where(np.abs(axis[:, :1]) < 0.9, [[1, 0, 0]], [[0, 1, 0]])
+    u = np.cross(axis, helper); u /= np.linalg.norm(u, axis=1, keepdims=True)
+    v = np.cross(axis, u)
+    shell = rng.choice([0.3, 0.5, 0.68, 0.84, 1.0, 1.18], count, p=[.1, .15, .2, .2, .2, .15]) * rng.uniform(.98, 1.02, count)
+    arcs = dict(r=shell, u=u, v=v, start=rng.uniform(0, 2 * math.pi, count), length=rng.uniform(0.3, 2.6, count),
+                speed=rng.choice([-1, 1], count) * rng.uniform(0.2, 1.2, count), light=rng.uniform(0.7, 1, count),
+                width=rng.choice([1, 1, 1, 2, 3], count))
+    sparks = rng.normal(size=(70, 3))
+    sparks = sparks / np.linalg.norm(sparks, axis=1, keepdims=True) * rng.uniform(0.3, 1.2, (70, 1))
+    return arcs, sparks
 
 
-def _frame(color: str, letter: str, radii: list[float], breath: float, arc: float | None):
-    from PIL import Image, ImageDraw
-    disc, glow, top = _core(color, letter)
-    S, c, accent = SIZE * 2, SIZE, _rgb(color)
-    img = disc.copy()
-    img.alpha_composite(Image.blend(Image.new("RGBA", glow.size, _rgb(BG) + (0,)), glow, 0.6 + 0.4 * breath))
-    rings = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    d = ImageDraw.Draw(rings)
-    for i, r in enumerate(radii):
-        r = min(r * 2, S / 2 - 6)
-        k = (1, .8, .6)[i]  # outer rings dimmer, but solid: the window can't do half-transparent pixels
-        d.ellipse((c - r, c - r, c + r, c + r), outline=tuple(round(x * k + y * (1 - k)) for x, y in zip(accent, _rgb(BG))) + (255,),
-                  width=(4, 3, 3)[i])
-    if arc is not None:  # thinking: spinning arc
-        d.arc((c - 88, c - 88, c + 88, c + 88), start=arc, end=arc + 70, fill=(255, 208, 138, 255), width=6)
-    img.alpha_composite(rings)
-    img.alpha_composite(top)
+@lru_cache(maxsize=64)
+def _glow(radius: int):
+    """The light in the middle, blurred once per size."""
+    from PIL import Image, ImageDraw, ImageFilter
+    S, c = SIZE * 2, SIZE
+    img = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(img).ellipse((c - radius, c - radius, c + radius, c + radius), fill=200)
+    return img.filter(ImageFilter.GaussianBlur(radius * 0.55))
+
+
+def _frame(color: str, letter: str, phase: float, level: float, alive: bool):
+    """The hologram turning slowly; with your voice or his its arcs race around and the shells open up."""
+    import numpy as np
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+    S, c = SIZE * 2, SIZE
+    radius = S * 0.3 * (1 + 0.08 * level)
+    arcs, sparks = _sphere()
+    ay, ax = phase * 0.12, 0.35 + 0.1 * math.sin(phase * 0.21)
+    cy, sy, cx, sx = math.cos(ay), math.sin(ay), math.cos(ax), math.sin(ax)
+
+    def view(p):  # turn the whole sphere, then tilt it toward you; returns x, y on screen and depth 0 (back) .. 1 (front)
+        x, z = p[..., 0] * cy + p[..., 2] * sy, -p[..., 0] * sy + p[..., 2] * cy
+        y, z = p[..., 1] * cx - z * sx, p[..., 1] * sx + z * cx
+        return c + radius * x, c + radius * y, np.clip((z / 1.2 + 1) / 2, 0, 1)
+
+    spin = phase * 0.6  # always the calm pace of rest: the voice only opens the shells
+    t = arcs["start"][:, None] + arcs["speed"][:, None] * spin + arcs["length"][:, None] * np.linspace(0, 1, 14)
+    grow = 1 + level * 0.12 * np.sin(arcs["start"] * 5 + phase)  # each shell breathes on its own
+    pts = (arcs["r"] * grow)[:, None, None] * (np.cos(t)[..., None] * arcs["u"][:, None] + np.sin(t)[..., None] * arcs["v"][:, None])
+    X, Y, D = view(pts)
+    layers = [Image.new("L", (S, S), 0) for _ in range(4)]  # arcs spread over 4 layers and added: where they cross, light piles up
+    for i in range(len(X)):
+        light = arcs["light"][i] * (0.08 + 0.92 * D[i].mean() ** 1.3)
+        ImageDraw.Draw(layers[i % 4]).line(list(zip(X[i], Y[i])), fill=int(235 * light), width=max(2, round(arcs["width"][i] * 1.2)))
+    d = ImageDraw.Draw(layers[0])
+    sx_, sy_, sd = view(sparks * (1 + level * 0.2))
+    for x, y, b in zip(sx_, sy_, sd):
+        d.rectangle((x - 1, y - 1, x + 1, y + 1), fill=int(180 * b))
+    total = sum(np.asarray(layer, dtype=np.uint16) for layer in layers)
+    sharp = Image.fromarray(np.clip(total, 0, 255).astype(np.uint8))
+    halo = sharp.filter(ImageFilter.GaussianBlur(1.5)).point(lambda v: min(255, int(v * 1.2)))  # the soft light around every line
+    core = _glow(int(radius * (0.45 + 0.15 * level)))
+    alpha = ImageChops.add(ImageChops.lighter(sharp, halo), core.point(lambda v: v // 3))
+    hot = Image.fromarray(np.clip((total.astype(np.int32) - 170) * 3, 0, 255).astype(np.uint8))  # where lines pile up they burn white
+    hot = ImageChops.lighter(hot, core.point(lambda v: max(0, v * 2 - 220)))
+    alpha = ImageChops.lighter(alpha, Image.new("L", (S, S), 2))  # invisible, but catches the mouse everywhere
+    img = Image.composite(Image.new("RGB", (S, S), _mix(color, "#ffffff", 0.75)), Image.new("RGB", (S, S), color), hot)
+    img.putalpha(alpha)
     return img.resize((SIZE, SIZE), Image.LANCZOS)
 
 
@@ -227,7 +252,7 @@ class Orb:
     def _animate(self) -> None:
         """Drawn with PIL at 2x and scaled down: smooth rings and a glowing core (tk's canvas can't antialias)."""
         color = self.colors.get(self.state, self.colors["idle"])
-        wait = 40 if self.state in ("listening", "speaking", "thinking") else 125  # at rest it only breathes: 8 fps
+        wait = 40 if self.state in ("listening", "speaking", "thinking") else 80  # at rest it turns slowly: 12 fps
         self.phase += 0.12 * wait / 40
         try:  # "I'm looking at your screen": two bright white flashes for 1.5 s after every capture
             looked = time.time() - SCREEN.stat().st_mtime
@@ -238,13 +263,10 @@ class Orb:
         alive = self.state in ("listening", "speaking", "thinking")
         source = {"listening": "mic", "speaking": "voice"}.get(self.state)
         now = self.level(source) if self.level and source else 0.0
-        self.smooth = max(now, self.smooth * 0.75)  # jumps up, eases down
-        flash = 8 * abs(math.sin(looked * math.pi * 2.6)) if looked < 1.5 else 0
-        radii = [flash + 30 + i * 8 + math.sin(self.phase * (2 if alive else 0.6) + i) * (4 if alive else 1.5)
-                 + self.smooth * (5 + i * 4) for i in range(3)]  # rings breathe and open with the volume
-        breath = 0.5 + 0.5 * math.sin(self.phase * (1.2 if alive else 0.35))  # slow pulse of the core's light
-        arc = (self.phase * 90) % 360 if self.state == "thinking" else None
-        _layered(self.hwnd, _frame(color, self.letter, radii, breath, arc), self.canvas.winfo_rootx(), self.canvas.winfo_rooty())
+        self.smooth += (now - self.smooth) * 0.12  # eases both ways: no twitching with every syllable
+        flash = abs(math.sin(looked * math.pi * 2.6)) if looked < 1.5 else 0
+        level = min(1.0, self.smooth + flash + (0.25 * (0.5 + 0.5 * math.sin(self.phase * 3)) if self.state == "thinking" else 0))
+        _layered(self.hwnd, _frame(color, self.letter, self.phase, level, alive), self.canvas.winfo_rootx(), self.canvas.winfo_rooty())
         self.root.after(40 if looked < 1.5 else wait, self._animate)
 
     def _press(self, e) -> None:

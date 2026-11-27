@@ -1,0 +1,211 @@
+<!-- Added by the panel when it serves your graph (graphify regenerates graph.html, so the skin lives here).
+     The graph as a 3D orb like JARVIS's: each community a region of the sphere, links as glowing arcs over it
+     with light running along them. Drag to turn it, wheel to zoom, click a node to inspect it, click a community
+     in the list to keep only its color. Drawn on one plain canvas (no shadows), so it stays smooth. -->
+<style>
+  body { background: #010305 !important; }
+  #graph { position: relative; background: radial-gradient(900px 640px at 50% 50%, #061422, #010305 70%) !important; }
+  #graph > .vis-network { visibility: hidden; }
+  #orb3d { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  #orb3d.drag { cursor: grabbing; } #orb3d.hot { cursor: pointer; }
+  #sidebar, #legend-wrap, #info-panel, #search-wrap { background: #03080d !important; border-color: #0e2233 !important; }
+  #legend-wrap h3, #info-panel h3 { color: #38e1ff !important; letter-spacing: .22em !important; font-family: "Chakra Petch", "Segoe UI", sans-serif; }
+  .legend-item { border-radius: 2px !important; transition: opacity .25s, background .2s; }
+  .legend-item:hover { background: #08182a !important; }
+  .legend-item.focus { background: #0a2236 !important; box-shadow: inset 2px 0 0 currentColor; }
+  .legend-item.faded { opacity: .35; }
+  .legend-dot { box-shadow: 0 0 8px currentColor; }
+  input#search { background: #010305 !important; border-color: #17384f !important; color: #dff4ff !important; }
+</style>
+<script>
+(() => {
+  network.setOptions({ physics: { enabled: false } }); network.stopSimulation();  // vis keeps the data and the info panel; it no longer draws
+  const hex = (c) => (typeof c === "string" ? c : (c && c.background) || "#38e1ff").slice(0, 7);
+  const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+  // ---- layout: communities spread over the sphere (Fibonacci), each one's nodes spiral out from its hub
+  const comms = [...LEGEND].sort((a, b) => b.count - a.count), center = {}, shell = {};
+  const SH = [0.3, 0.48, 0.62, 0.74, 0.84];  // nested shells, like the orb: each community lives on one of them
+  comms.forEach((c, i) => {
+    shell[c.cid] = SH[i % SH.length];
+    const y = 1 - 2 * (i + 0.5) / comms.length, r = Math.sqrt(1 - y * y), th = i * 2.39996;
+    center[c.cid] = [Math.cos(th) * r, y, Math.sin(th) * r];
+  });
+  const N = {}, byComm = {};
+  RAW_NODES.forEach((n) => (byComm[n.community] ??= []).push(n));
+  for (const [cid, list] of Object.entries(byComm)) {
+    const c = center[cid] || norm([Math.random() - .5, Math.random() - .5, Math.random() - .5]);
+    const u = norm(cross(c, Math.abs(c[1]) < .9 ? [0, 1, 0] : [1, 0, 0])), v = cross(c, u);
+    const spread = Math.min(0.45, 0.1 + 0.04 * Math.sqrt(list.length)), rs = shell[cid] || 0.8;
+    list.sort((a, b) => (b.degree || 0) - (a.degree || 0)).forEach((n, k) => {
+      const a = k ? spread * Math.sqrt(k / list.length) + 0.06 : 0, th = k * 2.39996;
+      const d = norm([c[0] + a * (Math.cos(th) * u[0] + Math.sin(th) * v[0]), c[1] + a * (Math.cos(th) * u[1] + Math.sin(th) * v[1]),
+                              c[2] + a * (Math.cos(th) * u[2] + Math.sin(th) * v[2])]), r = rs * (k ? 0.92 + 0.16 * ((k * 0.618) % 1) : 1);
+      N[n.id] = { n, p: [d[0] * r, d[1] * r, d[2] * r], dir: d, r,
+                  color: hex(n.color), size: 2.2 + Math.sqrt(n.degree || 1) * 1.6, comm: n.community, s: [0, 0, 0] };
+    });
+  }
+  // links: arcs over the surface (slerp), lifted in the middle like the orb's shells
+  const E = RAW_EDGES.filter((e) => N[e.from] && N[e.to]).map((e) => {
+    const a = N[e.from].dir, b = N[e.to].dir, ra = N[e.from].r, rb = N[e.to].r, dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])), w = Math.acos(dot), pts = [];
+    const twist = (Math.random() < 0.5 ? -1 : 1) * (0.25 + Math.random() * 0.45);
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16, s = Math.sin(w) || 1, k1 = w ? Math.sin((1 - t) * w) / s : 1 - t, k2 = w ? Math.sin(t * w) / s : t;
+      const lift = (ra + (rb - ra) * t) * (1 - 0.18 * Math.sin(Math.PI * t) * (w / Math.PI));  // cables dip inward: a tangle, not a net
+      const side = norm(cross(a, b)), bow = Math.sin(Math.PI * t) * twist;
+      const q = norm([a[0] * k1 + b[0] * k2 + side[0] * bow, a[1] * k1 + b[1] * k2 + side[1] * bow, a[2] * k1 + b[2] * k2 + side[2] * bow]);
+      pts.push([q[0] * lift, q[1] * lift, q[2] * lift]);
+    }
+    return { from: e.from, to: e.to, pts, color: N[e.from].color, off: Math.random() };
+  });
+  const neighbors = {};
+  E.forEach((e) => { (neighbors[e.from] ??= new Set()).add(e.to); (neighbors[e.to] ??= new Set()).add(e.from); });
+
+  // one glow sprite per color: drawing an image is far cheaper than canvas shadows
+  const sprites = {};
+  const sprite = (c) => sprites[c] ??= (() => {
+    const s = document.createElement("canvas"); s.width = s.height = 64; const g = s.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    r.addColorStop(0, "#ffffff"); r.addColorStop(0.18, c); r.addColorStop(0.45, c + "55"); r.addColorStop(1, c + "00");
+    g.fillStyle = r; g.fillRect(0, 0, 64, 64); return s;
+  })();
+
+  // ---- canvas, camera and interaction
+  const host = document.getElementById("graph"), cvs = document.createElement("canvas"), g = cvs.getContext("2d");
+  cvs.id = "orb3d"; host.appendChild(cvs);
+  // the orb's own arcs, faint, so the ball reads as JARVIS even where there are no links
+  const deco = Array.from({ length: 120 }, (_, i) => {
+    const ax = norm(i < 70 ? [Math.random() * .4 - .2, 1, Math.random() * .4 - .2] : [Math.random() - .5, Math.random() - .5, Math.random() - .5]);
+    const u = norm(cross(ax, Math.abs(ax[0]) < .9 ? [1, 0, 0] : [0, 1, 0])), v = cross(ax, u);
+    return { u, v, r: 0.3 + 0.62 * ((i * 0.618) % 1), s: Math.random() * 6.28, len: .4 + Math.random() * 2, sp: (Math.random() < .5 ? -1 : 1) * (.05 + Math.random() * .15) };
+  });
+  let W = 0, H = 0, dpr = 1, yaw = 0, pitch = 0.35, zoom = 1, spin = true, drag = null, hover = null, selected = null, focus = null, goal = null, last = 0;
+  const hidden = new Set();
+  const syncHidden = () => { hidden.clear(); nodesDS.get().forEach((n) => n.hidden && hidden.add(n.id)); };
+  nodesDS.on("*", syncHidden);
+  function size() { dpr = devicePixelRatio || 1; W = host.clientWidth; H = host.clientHeight; cvs.width = W * dpr; cvs.height = H * dpr; }
+  new ResizeObserver(size).observe(host); size();
+
+  function project(p, out) {  // turn (yaw, then pitch), then a touch of perspective
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const x1 = p[0] * cy - p[2] * sy, z1 = p[0] * sy + p[2] * cy, y2 = p[1] * cp - z1 * sp, z2 = p[1] * sp + z1 * cp;
+    const R = Math.min(W, H) * 0.4 * zoom, k = 1 / (1 - z2 * 0.18);
+    out[0] = W / 2 + R * x1 * k; out[1] = H / 2 - R * y2 * k; out[2] = (z2 + 1.25) / 2.5;
+    return out;
+  }
+  const lit = (id) => !hidden.has(id) && (focus === null || N[id].comm === focus) && (selected === null || id === selected || neighbors[selected]?.has(id));
+
+  function draw(now) {
+    requestAnimationFrame(draw);
+    if (document.hidden || now - last < 30) return;  // ~30 fps is plenty, and leaves the PC alone
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (goal) { yaw += (goal[0] - yaw) * 0.12; pitch += (goal[1] - pitch) * 0.12; if (Math.abs(goal[0] - yaw) < 0.002) goal = null; }
+    else if (spin && !drag) yaw += dt * 0.08;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const R = Math.min(W, H) * 0.4 * zoom, q = [0, 0, 0];
+    // the shell: a faint sphere outline, rings and a core of light
+    g.globalCompositeOperation = "lighter";
+    const core = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, R * 1.05);
+    core.addColorStop(0, "#38e1ff22"); core.addColorStop(1, "#38e1ff00"); g.fillStyle = core; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "#38e1ff"; g.lineWidth = 1;
+    [[0.96, 0.16], [1.03, 0.09], [1.1, 0.05]].forEach(([r, a]) => { g.globalAlpha = a; g.beginPath(); g.arc(W / 2, H / 2, R * r, 0, 7); g.stroke(); });
+    g.globalAlpha = 0.18; g.setLineDash([2, 6]); g.beginPath(); g.arc(W / 2, H / 2, R * 1.03, now / 9000, now / 9000 + 4.5); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = "#38e1ff"; g.lineWidth = 1;
+    for (const a of deco) {
+      g.beginPath();
+      let depth = 0;
+      for (let k = 0; k <= 12; k++) {
+        const ang = a.s + a.sp * now / 1000 + a.len * k / 12, cs = Math.cos(ang) * a.r, sn = Math.sin(ang) * a.r;
+        project([cs * a.u[0] + sn * a.v[0], cs * a.u[1] + sn * a.v[1], cs * a.u[2] + sn * a.v[2]], q); depth += q[2];
+        k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]);
+      }
+      g.globalAlpha = 0.04 + 0.2 * (depth / 13) ** 2; g.stroke();
+    }
+    // links
+    for (const id in N) project(N[id].p, N[id].s);
+    g.lineWidth = 1.1;
+    for (const e of E) {
+      const on = lit(e.from) && lit(e.to);
+      if (!on && (hidden.has(e.from) || hidden.has(e.to))) continue;
+      const depth = (N[e.from].s[2] + N[e.to].s[2]) / 2;
+      g.globalAlpha = on ? 0.1 + 0.55 * depth * depth : 0.025; g.strokeStyle = e.color;
+      g.beginPath();
+      e.pts.forEach((p, i) => { project(p, q); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); });
+      g.stroke();
+      if (on) {  // light running along the link
+        const t = (now / 4500 + e.off) % 1, p = e.pts[Math.floor(t * 16)];
+        project(p, q); const s = 10 * (0.5 + depth); g.globalAlpha = 0.4 + 0.6 * depth;
+        g.drawImage(sprite(e.color), q[0] - s / 2, q[1] - s / 2, s, s);
+      }
+    }
+    // nodes, back to front
+    const order = Object.keys(N).filter((id) => !hidden.has(id)).sort((a, b) => N[a].s[2] - N[b].s[2]);
+    for (const id of order) {
+      const o = N[id], on = lit(id), s = o.size * (0.6 + 0.8 * o.s[2]) * (zoom ** 0.5) * (id === hover || id === selected ? 1.8 : 1) * 4;
+      g.globalAlpha = on ? 0.35 + 0.65 * o.s[2] : 0.05;
+      g.drawImage(sprite(o.color), o.s[0] - s / 2, o.s[1] - s / 2, s, s);
+    }
+    // labels: the big hubs, what you point at and what you picked
+    g.globalCompositeOperation = "source-over"; g.font = "11px 'JetBrains Mono', Consolas, monospace"; g.textAlign = "center";
+    for (const id of order) {
+      const o = N[id], on = lit(id), big = (o.n.degree || 0) >= 6;
+      if (!(id === hover || id === selected || (on && big && o.s[2] > 0.45) || (selected && on && o.s[2] > 0.3))) continue;
+      g.globalAlpha = id === hover || id === selected ? 1 : 0.35 + 0.6 * o.s[2];
+      g.fillStyle = "#010305"; g.fillText(o.n.label, o.s[0] + 1, o.s[1] + o.size * 2.4 + 9);
+      g.fillStyle = "#cfeeff"; g.fillText(o.n.label, o.s[0], o.s[1] + o.size * 2.4 + 8);
+    }
+    g.globalAlpha = 1;
+  }
+  requestAnimationFrame(draw);
+
+  function pick(x, y) {
+    let best = null, bd = 14 * 14;
+    for (const id in N) { const s = N[id].s; if (hidden.has(id) || s[2] < 0.3) continue;
+      const d = (s[0] - x) ** 2 + (s[1] - y) ** 2; if (d < bd) { bd = d; best = id; } }
+    return best;
+  }
+  cvs.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; cvs.setPointerCapture(e.pointerId); cvs.classList.add("drag"); goal = null; });
+  cvs.addEventListener("pointermove", (e) => {
+    const r = cvs.getBoundingClientRect();
+    if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved += Math.abs(dx) + Math.abs(dy);
+      yaw += dx * 0.006; pitch = Math.max(-1.4, Math.min(1.4, pitch + dy * 0.006)); drag.x = e.clientX; drag.y = e.clientY;
+    } else { hover = pick(e.clientX - r.left, e.clientY - r.top); cvs.classList.toggle("hot", !!hover); }
+  });
+  cvs.addEventListener("pointerup", (e) => {
+    const moved = drag && drag.moved > 4; drag = null; cvs.classList.remove("drag");
+    if (moved) return;
+    const r = cvs.getBoundingClientRect(), id = pick(e.clientX - r.left, e.clientY - r.top);
+    selected = id; spin = !id;
+    if (id) showInfo(id); else document.getElementById("info-content").innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  });
+  cvs.addEventListener("wheel", (e) => { e.preventDefault(); zoom = Math.max(0.5, Math.min(3.5, zoom * (e.deltaY < 0 ? 1.1 : 0.9))); }, { passive: false });
+
+  // search and neighbor links keep working: they now turn the orb to the node
+  network.focus = (id) => {
+    const p = N[id]?.p; if (!p) return;
+    const y = Math.atan2(p[0], p[2]); let target = y; while (target - yaw > Math.PI) target -= 2 * Math.PI; while (yaw - target > Math.PI) target += 2 * Math.PI;
+    goal = [target, Math.atan2(p[1], Math.hypot(p[0], p[2]))]; spin = false;
+  };
+  network.selectNodes = (ids) => { selected = ids[0] ?? null; };
+
+  // a click on a community: it keeps its color, the rest fades; click it again to see all
+  document.querySelectorAll(".legend-item").forEach((item, i) => {
+    const c = LEGEND[i]; if (!c) return;
+    item.style.color = c.color;
+    item.onclick = (e) => {
+      if (e.target.classList.contains("legend-cb")) return;  // the checkbox still hides it
+      focus = focus === c.cid ? null : c.cid; selected = null;
+      document.querySelectorAll(".legend-item").forEach((x, j) => {
+        x.classList.toggle("focus", focus !== null && LEGEND[j]?.cid === focus);
+        x.classList.toggle("faded", focus !== null && LEGEND[j]?.cid !== focus);
+      });
+      if (focus !== null && center[focus]) {  // and the orb turns to show it
+        const p = center[focus]; let target = Math.atan2(p[0], p[2]);
+        while (target - yaw > Math.PI) target -= 2 * Math.PI; while (yaw - target > Math.PI) target += 2 * Math.PI;
+        goal = [target, Math.atan2(p[1], Math.hypot(p[0], p[2]))]; spin = false;
+      } else spin = true;
+    };
+  });
+})();
+</script>

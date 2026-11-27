@@ -223,6 +223,7 @@ def app(with_voice: bool) -> None:
         said = " ".join(getattr(parts["ears"], "said", []) if parts["ears"] and parts["ears"].speaking else [])
         if settings.load()["agent"]["kind"] == "claude-cli":
             brain._cli.stop()  # kills its thinking and tools; the next question opens a fresh one
+            brain.note("he cut you off while you answered; he only heard: «" + (said[-300:] or "nothing") + "», the rest he did NOT hear")
             print(time.strftime("%H:%M:%S"), "stopped by fist (claude-cli)")
             return
         if settings.load()["agent"]["kind"] != "openclaw":
@@ -366,6 +367,7 @@ def app(with_voice: bool) -> None:
             threading.Thread(target=hotkey_listener, args=(parts["ears"].by_hotkey,), daemon=True).start()
             from .voice import ClapDetector
             parts["ears"].claps = ClapDetector(clapped)
+            parts["ears"].on_barge = stop_all  # talking over him stops the whole answer, not just this sentence
             text, spoken = GREETING[lang]
             if not settings.IDENTITY.exists() and settings.load()["agent"]["kind"] != "claude-cli":
                 from .brain import asked

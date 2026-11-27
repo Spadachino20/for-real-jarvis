@@ -7,7 +7,8 @@
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="icon" href="/static/orb.ico" sizes="any">
 <link rel="icon" href="/static/orb-192.png" type="image/png">
-<meta name="theme-color" content="#05090f">
+<meta name="theme-color" content="#010305">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@300;400&display=swap">
 <style>
   :root {
     --bg: #05090f; --surface: #0a111c; --surface2: #0e1726; --line: #15233a; --line2: #1f3350;
@@ -169,6 +170,110 @@
     .chat { height: 70vh; } .msg { max-width: 92%; }
     .bar:not(:nth-child(5n+1)) em { display: none; }
   }
+
+  /* ---- HUD skin: deep black, a faint blueprint grid, framed cards with corner brackets, mono readouts ---- */
+  :root { --bg: #010305; --surface: #050b12; --surface2: #08121d; --line: #0e2233; --line2: #17384f;
+          --text: #dff4ff; --soft: #7fa3bb; --dim: #3f5a6e; --speak: #ff8a1f;
+          --display: "Chakra Petch", "Segoe UI Semibold", sans-serif; --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace; }
+  body { font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+         background: radial-gradient(900px 520px at 55% -10%, color-mix(in srgb, var(--cyan) 9%, transparent), transparent 70%),
+                     linear-gradient(color-mix(in srgb, var(--cyan) 4%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
+                     linear-gradient(90deg, color-mix(in srgb, var(--cyan) 4%, transparent) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg); }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;  /* scanlines, barely there */
+                background: repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px); }
+  nav, aside { background: linear-gradient(180deg, rgba(4,10,16,.92), rgba(1,3,5,.96)); backdrop-filter: blur(6px); }
+  nav { border-right-color: var(--line); }
+  .brand b { font-family: var(--display); font-weight: 700; letter-spacing: .32em; color: var(--cyan);
+             text-shadow: 0 0 14px color-mix(in srgb, var(--cyan) 60%, transparent); }
+  .brand i { border-radius: 0; transform: rotate(45deg); }
+  nav button { border-radius: 2px; font-size: 13px; letter-spacing: .02em; }
+  nav button[aria-current="page"] { background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 14%, transparent), transparent); color: var(--cyan); }
+  nav button[aria-current="page"] svg { filter: drop-shadow(0 0 5px var(--cyan)); }
+  nav hr { border: 0; height: 1px; margin: 8px 10px; background: linear-gradient(90deg, var(--line2), transparent); }
+  h1 { font-family: var(--display); font-weight: 600; letter-spacing: .2em; text-transform: uppercase; font-size: 18px; color: var(--cyan); }
+  h1::before { content: "// "; color: var(--dim); }
+  .lead { font-size: 13px; }
+  .card { background: linear-gradient(180deg, rgba(8,18,29,.85), rgba(3,8,13,.92)); border: 1px solid var(--line); border-radius: 2px; position: relative;
+          box-shadow: inset 0 1px 0 color-mix(in srgb, var(--cyan) 7%, transparent); }
+  .card::before, .card::after { content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none; transition: .25s;
+                                border: 1.5px solid color-mix(in srgb, var(--cyan) 70%, transparent); }
+  .card::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .card::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+  .card:hover { border-color: var(--line2); }
+  .card:hover::before, .card:hover::after { width: 22px; height: 22px; border-color: var(--cyan); }
+  .label { font: 600 11px var(--display); letter-spacing: .26em; color: var(--cyan); }
+  .label::after { opacity: .45; }
+  .label small { font-family: var(--mono); font-size: 11px; }
+  .num { font-family: var(--mono); font-weight: 300; }
+  .glow { text-shadow: 0 0 16px color-mix(in srgb, var(--cyan) 65%, transparent); color: color-mix(in srgb, var(--cyan) 35%, white); }
+  .hero { padding: 18px 28px; background: radial-gradient(420px 240px at 110px 50%, color-mix(in srgb, var(--orb) 20%, transparent), transparent 70%),
+          linear-gradient(180deg, rgba(8,18,29,.85), rgba(3,8,13,.92)); }
+  .orb { width: 190px; height: 190px; }
+  .orb canvas { width: 100%; height: 100%; display: block; }
+  .hello { font-family: var(--display); font-weight: 500; font-size: 30px; letter-spacing: .04em; }
+  .orbstate { font-family: var(--display); letter-spacing: .32em; }
+  .orbstate::before { content: "◆ "; }
+  .btn, .mode, .field, .compose textarea, .result, .x, .tip, .toast { border-radius: 2px; }
+  .btn { background: transparent; border-color: var(--line2); font-family: var(--display); letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+  .btn:hover:not(:disabled) { background: color-mix(in srgb, var(--cyan) 10%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--cyan) 22%, transparent); }
+  .btn.main { background: color-mix(in srgb, var(--cyan) 18%, transparent); color: color-mix(in srgb, var(--cyan) 40%, white); }
+  .mode { background: linear-gradient(135deg, var(--surface2), var(--surface)); clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+  .mode b { font-family: var(--display); letter-spacing: .05em; }
+  .mode:hover:not(:disabled) { background: linear-gradient(135deg, color-mix(in srgb, var(--cyan) 14%, var(--surface2)), var(--surface)); }
+  .track { height: 4px; border-radius: 0; background: #0a1a28; } .track i { border-radius: 0; box-shadow: 0 0 10px var(--cyan); }
+  .msg { border-radius: 2px; }
+  .msg.assistant { border-left: 2px solid var(--cyan); background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 6%, var(--surface)), var(--surface)); }
+  .msg.user { background: var(--surface2); border-color: var(--line2); }
+  aside h2 { font-family: var(--display); color: var(--cyan); letter-spacing: .26em; }
+  aside h2::before { content: "▸ "; color: var(--dim); }
+  .clock { font-family: var(--mono); font-size: 30px; color: color-mix(in srgb, var(--cyan) 35%, white); text-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 55%, transparent); }
+  .fact { border-top-color: var(--line); font-size: 12.5px; } .fact span:last-child { font-family: var(--mono); font-size: 12px; }
+  .dot { border-radius: 0; transform: rotate(45deg); }
+  .section.on { animation: boot .35s ease-out; }
+  @keyframes boot { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+  ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: var(--line2); } ::-webkit-scrollbar-track { background: transparent; }
+  @media (prefers-reduced-motion: reduce) { .section.on { animation: none; } }
+
+  /* ---- Home as a command deck: readouts left, the reactor in the middle, your day right, modes docked below ---- */
+  .app:has(#home.on) { grid-template-columns: 216px 1fr; } .app:has(#home.on) aside { display: none; }
+  main:has(#home.on) { padding: 18px 22px; }
+  #home.on { max-width: none; height: calc(100vh - 36px); }
+  .deck { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.6fr) minmax(240px, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 14px; height: 100%; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; } .col .grow { flex: 1; min-height: 0; overflow: auto; }
+  .stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 0; gap: 4px; }
+  .reactor { position: relative; width: min(52vh, 460px); aspect-ratio: 1; flex: none; }
+  .reactor::before { content: ""; position: absolute; inset: 12%; border-radius: 50%;
+                     background: radial-gradient(circle, color-mix(in srgb, var(--orb) 22%, transparent), transparent 68%); transition: background .5s; }
+  .reactor .orb { position: absolute; inset: 8%; width: auto; height: auto; }
+  .rings { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .rings * { fill: none; stroke: var(--orb); transform-origin: 200px 200px; transition: stroke .5s; }
+  .r1 { stroke-width: 1; opacity: .25; }
+  .r2 { stroke-width: 6; opacity: .35; stroke-dasharray: 1 7; animation: spin 90s linear infinite; }
+  .r3 { stroke-width: 2; opacity: .55; stroke-dasharray: 60 14 8 14; animation: spin 40s linear infinite reverse; }
+  .r4 { stroke-width: 1; opacity: .3; stroke-dasharray: 2 4; }
+  .r5 { stroke-width: 3; opacity: .7; stroke-linecap: round; animation: spin 24s linear infinite; } .r5.b { opacity: .35; }
+  .alive .rings .r3, .reactor:has(.alive) .r3 { animation-duration: 18s; }
+  .stage .hello { font-size: 32px; margin-top: 6px; } .stage .actions { justify-content: center; }
+  .dials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .dial { position: relative; display: grid; place-items: center; aspect-ratio: 1; }
+  .dial svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .dial circle { fill: none; } .dial .bg { stroke: #0b1d2b; stroke-width: 6; } .dial .tk { stroke: var(--line2); stroke-width: 1; stroke-dasharray: 1 5.15; }
+  .dial .fg { stroke: var(--cyan); stroke-width: 6; stroke-dasharray: 0 264; transition: stroke-dasharray .8s, stroke .4s;
+              filter: drop-shadow(0 0 4px var(--cyan)); }
+  .dial.high .fg { stroke: var(--orange); filter: drop-shadow(0 0 4px var(--orange)); } .dial.crit .fg { stroke: var(--red); filter: drop-shadow(0 0 4px var(--red)); }
+  .dial b { font: 300 20px var(--mono); margin-top: -10px; } .dial span { position: absolute; bottom: 24%; font: 600 9.5px var(--display); letter-spacing: .2em; color: var(--soft); }
+  .center { text-align: center; margin-top: 8px; }
+  .readouts { display: grid; gap: 12px; }
+  .ro { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .ro:last-child { border-bottom: 0; padding-bottom: 0; }
+  .ro span { font: 600 10.5px var(--display); letter-spacing: .22em; text-transform: uppercase; color: var(--cyan); }
+  .ro b { font: 300 24px var(--mono); text-align: right; } .ro small { grid-column: 1 / -1; color: var(--dim); font-size: 11.5px; }
+  .dock { grid-column: 1 / -1; }
+  .dock .modes { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); overflow-x: auto; padding-bottom: 2px; }
+  @media (max-width: 1180px) {
+    .app:has(#home.on) { grid-template-columns: 200px 1fr; }
+    #home.on { height: auto; } .deck { grid-template-columns: 1fr; grid-template-rows: none; height: auto; } .stage { order: -1; }
+  }
 </style>
 </head>
 <body>
@@ -176,14 +281,17 @@
   <nav aria-label="Sections">
     <div class="brand"><i></i><b>__NAME__</b></div>
     <button data-go="home"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg><span data-t="home">Home</span></button>
-    <button data-go="show"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg><span data-t="show">Show</span></button>
     <button data-go="chat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span data-t="chat">Chat</span></button>
+    <button data-go="show"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg><span data-t="show">Show</span></button>
+    <hr>
     <button data-go="modes"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg><span data-t="modes">Modes</span></button>
-    <button data-go="control"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-t="control">Control</span></button>
-    <button data-go="tokens"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span data-t="tokens">Tokens</span></button>
     <button data-go="automations"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span data-t="automations">Automations</span></button>
-    <button data-go="sessions"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-t="sessions">Sessions</span></button>
+    <hr>
+    <button data-go="control"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-t="control">Control</span></button>
     <button data-go="pc"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span>PC</span></button>
+    <button data-go="tokens"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span data-t="tokens">Tokens</span></button>
+    <button data-go="sessions"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-t="sessions">Sessions</span></button>
+    <hr>
     <button data-go="graph" __GRAPH__><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="17" r="2"/><path d="M8 7.5l8-1M7 9l4 6M17 8l-4 7"/></svg><span data-t="graph">Graph</span></button>
     <button data-go="logs"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/></svg><span data-t="logs">Logs</span></button>
     <div class="foot"><span data-t="onlyhere">Only from this PC</span><br><a id="agentLink" href="#" target="_blank" rel="noopener"></a></div>
@@ -191,28 +299,41 @@
 
   <main>
     <section class="section" id="home">
-      <div class="card hero">
-        <div class="orb" id="bigOrb"><span class="ring"></span><span class="ring"></span><span class="ring"></span><span class="arc"></span><span class="core">__LETTER__</span></div>
-        <div>
+      <div class="deck">
+        <div class="col">
+          <div class="card"><div class="label"><span data-t="system">System</span><small id="hNow"></small></div>
+            <div class="dials"><div class="dial" id="dCpu"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="tk" cx="50" cy="50" r="47"/><circle class="fg" cx="50" cy="50" r="42"/></svg><b>—</b><span>CPU</span></div><div class="dial" id="dRam"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="tk" cx="50" cy="50" r="47"/><circle class="fg" cx="50" cy="50" r="42"/></svg><b>—</b><span>RAM</span></div><div class="dial" id="dDisk"><svg viewBox="0 0 100 100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="tk" cx="50" cy="50" r="47"/><circle class="fg" cx="50" cy="50" r="42"/></svg><b>—</b><span>C:</span></div></div>
+            <div class="sub center" id="hPCsub"></div><div id="hPC" hidden></div></div>
+          <div class="card readouts">
+            <div class="ro"><span data-t="agent">Agent</span><b id="hAgent">—</b><small id="hModel"></small></div>
+            <div class="ro"><span data-t="reply">Reply time</span><b class="glow" id="hReply">—</b><small data-t="usual">usual, last 14</small></div>
+            <div class="ro"><span data-t="tokenstoday">Tokens today</span><b class="glow" id="hTokens">—</b><small id="hTokens30"></small></div>
+          </div>
+          <div class="card grow"><div class="label"><span data-t="stability">Stability</span><small data-t="30d">30 days</small></div><div id="hCrashes" class="empty">—</div></div>
+        </div>
+        <div class="stage">
+          <div class="reactor">
+            <svg class="rings" viewBox="0 0 400 400" aria-hidden="true">
+              <circle class="r1" cx="200" cy="200" r="196"/><circle class="r2" cx="200" cy="200" r="184"/>
+              <circle class="r3" cx="200" cy="200" r="170"/><circle class="r4" cx="200" cy="200" r="158"/>
+              <path class="r5" d="M200 22 A178 178 0 0 1 378 200"/><path class="r5 b" d="M200 378 A178 178 0 0 1 22 200"/>
+            </svg>
+            <div class="orb" id="bigOrb"><canvas id="holo" width="520" height="520" aria-hidden="true"></canvas></div>
+          </div>
           <div class="hello" id="hello"></div>
           <div class="orbstate" id="orbState">…</div>
-          <div class="sub" id="modeLine" style="margin-top:10px"></div>
+          <div class="sub" id="modeLine"></div>
           <div class="actions">
             <button class="btn main" data-task="personalize" data-t="personalize">Personalize JARVIS</button>
             <button class="btn" data-task="create-mode" data-t="newmode">Create a mode</button>
           </div>
         </div>
-      </div>
-      <div class="grid">
-        <div class="card s3"><div class="label" data-t="agent">Agent</div><div class="num" id="hAgent">—</div><div class="sub" id="hModel"></div></div>
-        <div class="card s3"><div class="label" data-t="reply">Reply time</div><div class="num glow" id="hReply">—</div><div class="sub" data-t="usual">usual, last 14</div></div>
-        <div class="card s3"><div class="label" data-t="tokenstoday">Tokens today</div><div class="num glow" id="hTokens">—</div><div class="sub" id="hTokens30"></div></div>
-        <div class="card s3"><div class="label">PC</div><div class="num" id="hPC">—</div><div class="sub" id="hPCsub"></div></div>
-        <div class="card s8"><div class="label"><span data-t="modes">Modes</span><small data-t="oneclick">one click</small></div><div class="modes" id="homeModes"></div>
-          <div class="result" id="homeResult" hidden></div></div>
-        <div class="card s4"><div class="label" data-t="music">Music</div><div id="hMusic" class="empty">—</div></div>
-        <div class="card s6"><div class="label" data-t="nextrem">Next reminders</div><div id="hReminders" class="empty">—</div></div>
-        <div class="card s6"><div class="label"><span data-t="stability">Stability</span><small data-t="30d">30 days</small></div><div id="hCrashes" class="empty">—</div></div>
+        <div class="col">
+          <div class="card"><div class="label" data-t="music">Music</div><div id="hMusic" class="empty">—</div></div>
+          <div class="card grow"><div class="label" data-t="nextrem">Next reminders</div><div id="hReminders" class="empty">—</div></div>
+        </div>
+        <div class="card dock"><div class="label"><span data-t="modes">Modes</span><small data-t="oneclick">one click</small></div>
+          <div class="modes" id="homeModes"></div><div class="result" id="homeResult" hidden></div></div>
       </div>
     </section>
 
@@ -407,7 +528,7 @@ document.getElementById("chatText").placeholder = t("placeholder");
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-const COLOR = {idle: "--idle", listening: "--cyan", thinking: "--orange", speaking: "--blue", loading: "--dim", "mic off": "--red"};
+const COLOR = {idle: "--cyan", listening: "--blue", thinking: "--blue", speaking: "--speak", loading: "--dim", "mic off": "--red"};
 const RAM = ["0x0000012b", "0x0000001a", "0x00000050", "0x000000ef"];  // blue screen codes that usually mean bad RAM
 const ICONS = {
   briefcase: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M9 6V4h6v2"/>', code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13 6l-2 12"/>',
@@ -498,7 +619,7 @@ function drawStatus(d) {
   const h = +d.now.slice(0, 2);
   $("hello").textContent = t(h < 12 ? "morning" : h < 19 ? "afternoon" : "evening");
   document.documentElement.style.setProperty("--orb", `var(${COLOR[o.state] || "--idle"})`);
-  $("bigOrb").classList.toggle("alive", ["listening", "speaking"].includes(o.state));
+  $("bigOrb").classList.toggle("alive", ["listening", "speaking"].includes(o.state)); $("bigOrb").dataset.state = o.state || "";
   $("bigOrb").classList.toggle("thinking", o.state === "thinking" || !!mn.working);
   $("orbState").textContent = mn.working && o.state !== "speaking" ? t("working") : t(o.state || "loading");
 
@@ -714,6 +835,66 @@ setInterval(quiet(() => current() === "chat" && loadChat()), 2500);
 setInterval(quiet(() => { const s = current(); if (s === "logs") return loadLogs(); if (s === "sessions") return loadSessions(); }), 6000);
 setInterval(quiet(() => Promise.all([loadAuto(), (current() === "tokens" || current() === "home") && loadTokens()])), 30000);
 try { const d = sessionStorage.getItem("draft"); if (d) { $("chatText").value = d; sessionStorage.removeItem("draft"); go("chat"); toast(t("send") + " ↵"); } } catch (e) {}
+
+// ---- the hologram on Home: nested shells of broken arcs, like the orb on the desktop (blue at rest, orange speaking)
+(function holo() {
+  const c = document.getElementById("holo"); if (!c) return;
+  const g = c.getContext("2d"), W = c.width, C = W / 2, still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const norm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const SH = [0.3, 0.5, 0.68, 0.84, 1, 1.18];
+  const arcs = Array.from({length: 170}, (_, i) => {
+    const ax = norm(i < 100 ? [rnd() * .4 - .2, 1, rnd() * .4 - .2] : [rnd() - .5, rnd() - .5, rnd() - .5]);
+    const u = norm(cross(ax, Math.abs(ax[0]) < .9 ? [1, 0, 0] : [0, 1, 0]));
+    return {u, v: cross(ax, u), r: SH[Math.floor(rnd() * 6)], s: rnd() * 6.28, len: .3 + rnd() * 2.3,
+            sp: (rnd() < .5 ? -1 : 1) * (.2 + rnd()), a: .7 + rnd() * .3, w: [1, 1, 1, 2, 3][Math.floor(rnd() * 5)]};
+  });
+  const sparks = Array.from({length: 60}, () => { const p = norm([rnd() - .5, rnd() - .5, rnd() - .5]), k = .3 + rnd() * .9; return p.map((x) => x * k); });
+  let t = 0, lvl = 0;
+  function frame() {
+    const st = document.getElementById("bigOrb").dataset.state || "idle", alive = st === "speaking" || st === "listening";
+    lvl += ((alive ? .55 + .35 * Math.sin(t * 2.2) : st === "thinking" ? .25 : 0) - lvl) * .06;
+    t += still ? 0 : .016;
+    const col = getComputedStyle(document.documentElement).getPropertyValue(st === "speaking" ? "--speak" : "--cyan").trim() || "#38e1ff";
+    const R = W * .3 * (1 + .08 * lvl), ay = t * .35, tx = .38 + .1 * Math.sin(t * .2), cy = Math.cos(ay), sy = Math.sin(ay), cx = Math.cos(tx), sx = Math.sin(tx);
+    const view = (p) => { const x = p[0] * cy + p[2] * sy, z0 = -p[0] * sy + p[2] * cy; return [C + R * x, C + R * (p[1] * cx - z0 * sx), Math.min(1, Math.max(0, ((p[1] * sx + z0 * cx) / 1.2 + 1) / 2))]; };
+    g.clearRect(0, 0, W, W);
+    const core = g.createRadialGradient(C, C, 0, C, C, R * (.45 + .15 * lvl));
+    core.addColorStop(0, col); core.addColorStop(.35, col + "66"); core.addColorStop(1, col + "00");
+    g.globalCompositeOperation = "lighter"; g.fillStyle = core; g.beginPath(); g.arc(C, C, R * (.45 + .15 * lvl), 0, 7); g.fill();
+    g.strokeStyle = col; g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 6; g.lineCap = "round";
+    for (const a of arcs) {
+      const grow = a.r * (1 + lvl * .12 * Math.sin(a.s * 5 + t * 1.5));
+      let d = 0; g.beginPath();
+      for (let k = 0; k <= 14; k++) {
+        const ang = a.s + a.sp * t * 1.2 + a.len * k / 14, cs = Math.cos(ang), sn = Math.sin(ang);
+        const [x, y, z] = view([0, 1, 2].map((j) => grow * (cs * a.u[j] + sn * a.v[j])));
+        k ? g.lineTo(x, y) : g.moveTo(x, y); d += z;
+      }
+      g.globalAlpha = a.a * (.08 + .92 * Math.pow(d / 15, 1.3)); g.lineWidth = a.w * 1.2; g.stroke();
+    }
+    for (const p of sparks) { const [x, y, z] = view(p.map((v) => v * (1 + lvl * .2))); g.globalAlpha = .2 + .8 * z; g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4); }
+    g.globalAlpha = 1; g.shadowBlur = 0; g.globalCompositeOperation = "source-over";
+    if (!document.hidden) requestAnimationFrame(frame); else setTimeout(frame, 500);
+  }
+  frame();
+})();
+
+// ---- Home dials: CPU, RAM and C: as rings, filled from the same status the rest of the panel reads
+const _drawStatus = drawStatus;
+drawStatus = function (d) {
+  _drawStatus(d);
+  const p = d.pc || {}, disk = (p.disks || [])[0] || {};
+  const dial = (id, pct, label) => {
+    const el = $(id); if (!el || pct == null) return;
+    el.querySelector(".fg").style.strokeDasharray = `${(264 * Math.min(100, pct) / 100).toFixed(1)} 264`;
+    el.querySelector("b").textContent = Math.round(pct) + "%"; if (label) el.querySelector("span").textContent = label;
+    el.classList.toggle("high", pct >= 75 && pct < 90); el.classList.toggle("crit", pct >= 90);
+  };
+  dial("dCpu", p.cpu); dial("dRam", p.ram_pct); dial("dDisk", disk.pct, disk.letter);
+  $("hNow").textContent = d.now || "";
+};
 </script>
 </body>
 </html>

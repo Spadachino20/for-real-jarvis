@@ -66,10 +66,22 @@ def _probe(q) -> None:  # self-test: runs in a spawned child
     q.put(getattr(sys.modules.get("torch"), "jarvis_stand_in", False))
 
 
+def _cpu_ears(s: dict) -> bool:
+    """Whisper on the CPU (no NVIDIA card, or "stt_device": "cpu"): RealtimeSTT only asks torch for CUDA, so it isn't needed."""
+    if s.get("stt_device") in ("cpu", "cuda"):
+        return s["stt_device"] == "cpu"
+    try:
+        import ctranslate2
+        return ctranslate2.get_cuda_device_count() == 0
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def install() -> None:
     from . import settings
     _no_arena()
-    if settings.load().get("stt") == "parakeet":
+    s = settings.load()
+    if s.get("stt") == "parakeet" or _cpu_ears(s):  # ~140 MB here and as much in the mic reader
         _no_torch()
 
 

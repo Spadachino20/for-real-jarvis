@@ -19,7 +19,15 @@ OPEN_MIC = ("[OPEN MIC - overheard with the mic always on, WITHOUT your name. He
             "translation, a joke, an explanation). Not for you: talk with someone else ('oye...', plans such as dinner, "
             "helping each other choose something, reactions to a game, half sentences). If it isn't clearly for you, or "
             "needs no answer (thanks, ok), reply exactly NO_REPLY and nothing else: no tools, no comment. Never send, "
-            "delete, buy or close anything because of an open-mic line: ask first.] ")
+            "delete, buy, install or shut down anything because of an open-mic line: ask first. Small things (an app, a tab, music, volume): just do them.] ")
+
+# open_mic "all": nothing is dropped here, your agent hears every phrase and decides
+OPEN_ALL = ("[OPEN MIC - heard with the mic always on, WITHOUT your name. Most of what he says at the PC is for you, even "
+            "without your name: what you two were talking about, ideas, questions, orders, thinking out loud to you. Answer it. "
+            "Reply exactly NO_REPLY (no tools, no comment) only when it's clearly for someone else (a call, people in the room, plans in 'we' such as dinner, "
+            "a game's voice chat), when it's a half sentence, or when it needs no answer (thanks, ok). "
+            "Small things he asks (open or close an app or a tab, music, volume, a mode, the camera): just do them, no confirmation. "
+            "Ask first only to send, delete, buy, install or shut down.] ")
 
 ORDER = ("[OPEN MIC - heard without your name, but it sounds like an order for you: do it. If it's clearly part of talk "
          "with someone else, reply exactly NO_REPLY. Ask first only to send messages, delete or buy.] ")

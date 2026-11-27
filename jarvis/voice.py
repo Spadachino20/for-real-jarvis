@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import collections
 import re
+import sys
 import threading
 import time
 from typing import Callable
@@ -437,6 +438,7 @@ class Ears:
     def __init__(self, on_heard: Callable[[str], None], state: Callable[[str], None]) -> None:
         self.state, self.on_heard = state, on_heard
         self.running, self.mic_on, self.speaking = True, True, False
+        self.on_barge = cut  # __main__ swaps it for one that also stops the rest of the answer
         self._awake_until = 0.0
         self._last_audio = time.time()
         self.claps: ClapDetector | None = None   # set by the app: clap-clap -> work mode
@@ -455,7 +457,7 @@ class Ears:
         if s.get("stt") == "parakeet":  # loaded now: the first "Jarvis" used to wait ~2 s for Whisper
             from . import stt
             threading.Thread(target=lambda: stt.says_name(np.random.default_rng(0).normal(0, .02, 16000).astype(np.float32)), daemon=True).start()
-        if not s.get("fast_wake", True) or s.get("stt") == "parakeet":  # _hear_name does it, "Jarvis" alone too: ~120 MB less
+        if not s.get("fast_wake", True) or s.get("stt") == "parakeet" or s.get("open_mic") == "all":  # _hear_name does it; with the mic open to everything he hears it all anyway: ~120 MB less
             return
         try:
             from openwakeword.model import Model
@@ -478,7 +480,7 @@ class Ears:
             model=s["whisper_model"], language=_lang(), device=_device(), compute_type="float16" if _device() == "cuda" else "int8", beam_size=5,  # 1 garbles short words ("sí" -> "C")
             initial_prompt=("Oye Jarvis, sí, dale, procedé, poné el modo trabajo, por favor. " if _lang() == "es" else "") +  # a Spanish prompt keeps Whisper in Spanish
             f"{settings.identity()['short'].title()}, {s['vocabulary']} {', '.join(m.get('title', '') for m in settings.modes())}", input_device_index=index, spinner=False,
-            silero_sensitivity=0.4, silero_backend="raw_onnx" if s.get("stt") == "parakeet" else "official_onnx",  # raw: no torch (jarvis/lean.py) silero_deactivity_detection=True,
+            silero_sensitivity=0.4, silero_backend="raw_onnx" if getattr(sys.modules.get("torch"), "jarvis_stand_in", False) else "official_onnx",  # raw: no torch (jarvis/lean.py) silero_deactivity_detection=True,
             webrtc_sensitivity=3, post_speech_silence_duration=s.get("silence_sec", 0.45), min_length_of_recording=0.4, pre_recording_buffer_duration=0.6,  # 0.2 clipped the first syllable
             on_recording_start=self._starts, on_recording_stop=self._stops, on_recorded_chunk=self._audio,
             no_log_file=True)
@@ -533,9 +535,19 @@ class Ears:
 
     def _starts(self) -> None:
         self._rec_start = time.time()
+        if self.speaking and settings.load().get("barge_in"):
+            threading.Thread(target=self._barge, args=(self._rec_start,), daemon=True).start()
         if (self.mic_on and not self.speaking and not self.awake() and settings.load().get("fast_wake", True)
                 and settings.load().get("stt") == "parakeet"):
             threading.Thread(target=self._hear_name, args=(self._rec_start,), daemon=True).start()
+
+    def _barge(self, start: float) -> None:
+        """barge_in (headphones: he can't hear himself): you start talking over him and he goes quiet at once,
+        then takes what you said as a new request. 0.6 s of voice first, so a cough doesn't cut him."""
+        time.sleep(0.6)
+        if self.speaking and self._rec_start == start and getattr(self, "_rec_end", 0) < start:
+            print(time.strftime("%H:%M:%S"), "cut off by your voice")
+            self.on_barge()
 
     def _hear_name(self, start: float) -> None:
         """"Jarvis" on its own (openWakeWord only knows "hey Jarvis"): Parakeet reads along while you're still talking
@@ -681,18 +693,26 @@ class Ears:
                 from .panel import _pending
                 if not (_pending and addressed.decide(text, True) == "maybe" and len(text.split()) <= 3):  # the yes/no he's waiting for
                     verdict = addressed.decide(text, time.time() < max(self._talk_until, self._awake_until))
+                    every = settings.load().get("open_mic") == "all"
+                    if every and verdict == "no" and (len(text.split()) >= 2 or addressed._REPLY.match(text)):
+                        verdict = "all"  # your agent decides, with the whole conversation in mind
                     if verdict == "no":  # someone else's: silence, and not even the words in the log
                         print(time.strftime("%H:%M:%S"), f"overheard, not for him ({len(text.split())} words)")
                         if self._awake_until:
                             self._sleep()
                         continue
                     print(time.strftime("%H:%M:%S"), f"open mic, {'order' if verdict == 'yes' else 'maybe for him'}:", text[:80])
-                    note = addressed.ORDER if verdict == "yes" else addressed.OPEN_MIC
+                    note = addressed.ORDER if verdict == "yes" else addressed.OPEN_ALL if every else addressed.OPEN_MIC
                     threading.Thread(target=self.on_heard, args=(request, note), daemon=True).start()
                     continue
             print(time.strftime("%H:%M:%S"), "heard:", text[:80])
             if self.during_his_voice():  # only "Jarvis…" or a stop phrase cut him off; the rest is his echo
-                if not (called or is_stop(text)):
+                if settings.load().get("barge_in"):  # headphones: it's you, not his echo
+                    self.on_barge()
+                    if is_stop(text):
+                        continue
+                    called = True  # what you said over him is for him
+                elif not (called or is_stop(text)):
                     continue
                 print(time.strftime("%H:%M:%S"), "cut off by you:", text)
                 cut()

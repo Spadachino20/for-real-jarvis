@@ -726,7 +726,8 @@ def start(orb: Callable[[], dict]) -> str | None:
                 file = Path(settings.load()["graph"] or "-")
                 if file.suffix.lower() != ".html" or not file.is_file():
                     return self._json({"error": "not found"}, 404)
-                return self._send(200, file.read_bytes(), "text/html; charset=utf-8", frame="SAMEORIGIN")
+                skin = (HERE / "static" / "graph-skin.html").read_bytes()  # lights and community focus, kept apart from graphify's file
+                return self._send(200, file.read_bytes().replace(b"</body>", skin + b"</body>", 1), "text/html; charset=utf-8", frame="SAMEORIGIN")
             if path == "/api/orblog":
                 return self._json(orb_log()[::-1])
             if path == "/api/status":

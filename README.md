@@ -231,11 +231,14 @@ you visit can press them.
 | `send_ok` | `[]` | sites the agent may post to when you name them in the order ("post about X on Moltbook"): `["moltbook.com"]` |
 | `push_ok` | `[]` | the brake (`jarvis/guard.py`) asks your yes before shutting down, deleting, force-closing, sending, pushing, installing... (`claude-cli`); folders named here may be pushed without asking |
 | `open_mic` | `false` | no wake word: orders only he can do ("abrí Forza") and follow-ups to what he just said; anything else is ignored, and your agent can stay silent (NO_REPLY). `jarvis/addressed.py` |
+| `open_mic: "all"` | | every phrase near the mic goes to your agent, which answers or stays silent by itself: it no longer misses what's for him, and costs one short turn per phrase
+| `barge_in` | `false` | with headphones: start talking over him and he goes quiet at once, and takes what you said as the next request (without headphones he'd cut himself) |
 | `start_house` | — | `"light"` (needs `agent_openclaw`): JARVIS starts in the light `claude` house, no OpenClaw needed at boot, and goes to OpenClaw only when you say "switch to OpenClaw" ("mudate a OpenClaw"); "back to the light house" closes it |
 | `agent_openclaw` | — | your OpenClaw agent config: then game modes move JARVIS to the light `claude` house and close OpenClaw (~1.7 GB freed), other modes bring him back, conversation included |
 | `clap_mode` / `horns_mode` | `""` / `juego` | the mode two claps / the 🤘 gesture start |
 | `gestures` | `false` | webcam hand gestures, trained on your own hands (see below) |
 | `fast_wake` / `wake_threshold` | `true` / `0.5` | beep ~0.2 s after "Hey Jarvis" (openWakeWord) instead of after the transcription |
+| `whisper_model` | `"small"` | **On a laptop:** `"base"` (~120 MB, ~0.7 s per phrase) instead of `"small"` (~260 MB, ~1.9 s). On the CPU, Whisper runs without torch (~270 MB less); `"stt": "parakeet"` is ~10x faster but takes ~850 MB |
 
 ### Hand gestures (webcam)
 
